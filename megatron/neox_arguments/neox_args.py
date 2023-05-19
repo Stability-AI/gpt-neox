@@ -167,12 +167,6 @@ class NeoXArgsModel(NeoXArgsTemplate):
     Disables weight tying between embedding weights and final Linear layer
     """
 
-    multi_query_attention: bool = False
-    """
-    Enables multi-query attention.
-    See: https://arxiv.org/abs/1911.02150
-    """
-
     attention_config: list = None
     """
     Attention configuration for gpt-neox
