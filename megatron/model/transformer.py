@@ -321,16 +321,16 @@ class ParallelSelfAttention(nn.Module):
         else:
             if self.use_flash_attention:
                 from megatron.model.flash_attention import (
-                    flash_attn_unpadded_qkvpacked_func,
+                    flash_attn_unpadded_qkvpacked_func_cuda,
                 )
 
-                self.flash_attention_function = flash_attn_unpadded_qkvpacked_func
+                self.flash_attention_function = flash_attn_unpadded_qkvpacked_func_cuda
                 if self.pos_emb == "alibi":
                     raise ValueError(
                         "Flash attention is currently not compatible with AliBi positional embeddings. Use sinuisoidal, learned, or rotary embeddings instead."
                     )
                 from megatron.model.flash_attention import (
-                    flash_attn_unpadded_qkvpacked_func,
+                    flash_attn_unpadded_qkvpacked_func_cuda,
                 )
 
             else:
