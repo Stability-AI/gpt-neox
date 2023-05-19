@@ -181,6 +181,9 @@ def init_wandb(neox_args):
                 "Skipping wandb. Execute `wandb login` on local or main node machine to enable.",
                 flush=True,
             )
+        if neox_args.launcher == "slurm" and neox_args.slurm_job_id is None:
+            assert os.environ["SLURM_JOB_ID"] is not None, "SLURM_JOB_ID not set"
+            neox_args.update_value("slurm_job_id", os.environ["SLURM_JOB_ID"])
         wandb.config.update(neox_args.all_config, allow_val_change=True)
 
 

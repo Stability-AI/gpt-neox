@@ -1,4 +1,12 @@
-# custom folders
+# Auto-generated
+hostfiles/
+logs/
+nccl-logs/
+data/
+sbatches
+test-checkpoints/
+
+# Custom local files/folders
 configs/local/*
 *_cache
 out
