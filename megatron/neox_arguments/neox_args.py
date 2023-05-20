@@ -1173,7 +1173,11 @@ class NeoXArgsTextgen(NeoXArgsTemplate):
     """
     Tasks to evaluate on using lm_eval_harness
     """
-    eval_num_fewshot: int = 0 
+    eval_num_fewshot: list = None 
     """
-    Number of fewshots during evaluation
+    Number of fewshots for each task specified in `eval_tasks` during evaluation
+    """
+    eval_limit: list = None 
+    """
+    Number of samples for each eval task specified in `eval_tasks` during evaluation
     """

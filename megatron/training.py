@@ -25,6 +25,7 @@ from functools import partial
 import math
 import os
 import sys
+import time
 
 import torch
 import deepspeed
@@ -976,11 +977,25 @@ def evaluate(
         )
 
     if neox_args.eval_tasks:
-        eval_results.update(
-            run_eval_harness(
-                model, forward_step_fn, neox_args, eval_tasks=neox_args.eval_tasks, num_fewshot=neox_args.eval_num_fewshot
-            ).get("results")
+        start = time.time()
+        harness_result = run_eval_harness(
+            model, forward_step_fn, neox_args, eval_tasks=neox_args.eval_tasks
         )
+        cost = round(time.time() - start)
+        print_rank_0(f"Cost {cost} seconds to run evaluation harness.")
+
+        # append meta info (fewshot, limit) to each task name
+        updated_harness_result = {}
+        task_names = neox_args.eval_tasks
+        num_fewshot = harness_result["config"]["num_fewshot"]
+        limit = harness_result["config"]["limit"]
+        for task_name, task_metric in harness_result["results"].items():
+            task_idx = task_names.index(task_name)
+            nfs = num_fewshot[task_idx]
+            task_limit = str(limit[task_idx])
+            updated_harness_result[f"{task_name}-{nfs}-{task_limit}"] = task_metric
+
+        eval_results.update(updated_harness_result)
     # Move model back to the train mode.
     model.train()
     return eval_results
