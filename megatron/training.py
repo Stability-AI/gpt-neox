@@ -186,7 +186,7 @@ def pretrain(neox_args):
         use_wandb=neox_args.use_wandb, tensorboard_writer=neox_args.tensorboard_writer
     )
     # initialize CheckpointCargo, the rank 0 of each host so that we don't have to worry about multiple ranks uploading the same checkpoint
-    
+
     if neox_args.local_rank == 0:
         if neox_args.save is not None and neox_args.s3_path is not None and neox_args.s3_region is not None:
             os.makedirs(neox_args.save, exist_ok=True)
@@ -201,9 +201,6 @@ def pretrain(neox_args):
             print_rank_0(f"Uploading checkpoints to {s3_path}")
         else:
             CG = None
-    
-
-
 
     # Initialize and get arguments, timers, and Tensorboard writer.
     hb = Heartbeat(timeout=neox_args.heartbeat_timeout, kill_timeout=neox_args.kill_timeout)
@@ -309,7 +306,6 @@ def pretrain(neox_args):
             chart_name="test",
         )
         hb.stop()
-    
 
     del hb
     hb = None
@@ -662,7 +658,8 @@ def setup_model_and_optimizer(neox_args, use_cache=False, iteration=None):
             lr_scheduler=_lr_scheduler,
             dist_init_required=False,
             model_parameters=_model_params,
-            config_params=neox_args.deepspeed_config,
+            # Default `neox_args.deepspeed_config` is `None` which raises an error with latest deepspeed.
+            # config_params=neox_args.deepspeed_config,
             mpu=mpu if not neox_args.is_pipe_parallel else None,
         )
         model.total_params = get_total_params(model.module)
