@@ -17,6 +17,7 @@
 
 """Transformer."""
 
+import einops
 import math
 import torch
 import torch.nn.functional as F
@@ -30,6 +31,7 @@ from megatron.model.utils import exists, get_fusion_type
 from megatron.model.positional_embeddings import (
     RotaryEmbedding,
     apply_rotary_pos_emb,
+    apply_rotary_pos_emb_torch,
     AliBi,
 )
 from megatron.model.fused_bias_dropout import (
@@ -527,7 +529,7 @@ class ParallelSelfAttention(nn.Module):
                 # full rotary
                 query_rot, key_rot = query_layer, key_layer
 
-            apply_rotary_fn = apply_rotary_pos_emb
+            apply_rotary_fn = apply_rotary_pos_emb_torch if self.bf16 else apply_rotary_pos_emb
 
             seq_len = key_layer.shape[0]
             offset = 0
@@ -594,6 +596,185 @@ class ParallelSelfAttention(nn.Module):
         return output, bias
 
 
+class FlashParallelSelfAttention(nn.Module):
+    """Flash parallel self-attention layer"""
+
+    def __init__(
+        self,
+        neox_args,
+        init_method,
+        output_layer_init_method,
+        layer_number,
+        use_cache=False,
+        parallel_output=False,
+    ):
+        super().__init__()
+        # NOTE: You must compile the flash kernels before using `rotary_emb`
+        from flash_attn.layers.rotary import RotaryEmbedding
+        from megatron.model.flash_attention import (
+            flash_attn_unpadded_qkvpacked_func_cuda,
+        )
+
+        self.fp16 = neox_args.precision == "fp16"
+        self.bf16 = neox_args.precision == "bfloat16"
+        self.use_cache = use_cache
+        assert self.use_cache is False, "Caching is not yet supported"
+        self.layer_number = layer_number
+
+        # Per attention head and per partition values.
+        world_size = mpu.get_model_parallel_world_size()
+        # dim_per_shard = hidden_dim // world_size
+        self.hidden_size_per_partition = mpu.divide(neox_args.hidden_size, world_size)
+        # dim_per_head = hidden_dim // num_heads
+        self.hidden_size_per_attention_head = mpu.divide(
+            neox_args.hidden_size, neox_args.num_attention_heads
+        )
+        self.num_attention_heads_per_partition = mpu.divide(
+            neox_args.num_attention_heads, world_size
+        )
+        self.pos_emb = neox_args.pos_emb
+
+        self.query_key_value = mpu.ColumnParallelLinear(
+            neox_args=neox_args,
+            input_size=neox_args.hidden_size,
+            output_size=3 * neox_args.hidden_size,
+            gather_output=False,
+            init_method=init_method,
+        )
+
+        if neox_args.pos_emb == "rotary":
+            if neox_args.rotary_pct == 1:
+                self.rotary_ndims = None
+            else:
+                assert neox_args.rotary_pct < 1
+                self.rotary_ndims = int(
+                    self.hidden_size_per_attention_head * neox_args.rotary_pct
+                )
+            dim = (
+                self.rotary_ndims
+                if self.rotary_ndims is not None
+                else self.hidden_size_per_attention_head
+            )
+            self.rotary_emb = RotaryEmbedding(
+                dim,
+                base=neox_args.rotary_emb_base,
+                interleaved=neox_args.rotary_interleaved,
+                scale_base=neox_args.rotary_scale_base,
+            )
+        else:
+            self.rotary_emb = None
+        self.attention_type = neox_args.attention_config[layer_number]
+
+        from megatron.model.flash_attention import (
+            flash_attn_unpadded_qkvpacked_func_cuda,
+        )
+        self.flash_attention_function = flash_attn_unpadded_qkvpacked_func_cuda
+        # Dropout. Note that for a single iteration, this layer will generate
+        # different outputs on different number of parallel partitions but
+        # on average it should not be partition dependent.
+        self.dropout_p = neox_args.attention_dropout
+
+        # Output.
+        self.dense = mpu.RowParallelLinear(
+            neox_args=neox_args,
+            input_size=neox_args.hidden_size,
+            output_size=neox_args.hidden_size,
+            input_is_parallel=True,
+            init_method=output_layer_init_method,
+            skip_bias_add=True,
+            parallel_output=parallel_output,
+            bias=neox_args.use_bias_in_attn_linear,
+        )
+
+    def forward(self, hidden_states, attention_mask, layer_past=None):
+        # =====================
+        # Query, Key, and Value
+        # =====================
+
+        # Attention heads [sq, b, h] --> [sq, b, (np * 3 * hn)]
+        mixed_x_layer, _ = self.query_key_value(hidden_states)
+
+        # [sq, b, (np * 3 * hn)] --> [sq, b, np, 3 * hn]
+        new_tensor_shape = mixed_x_layer.size()[:-1] + (
+            self.num_attention_heads_per_partition,
+            3 * self.hidden_size_per_attention_head,
+        )
+        mixed_x_layer = mixed_x_layer.view(*new_tensor_shape)
+        # [sq, b, np, 3 * hn] --> 3 [sq, b, np, hn]
+        (query_layer, key_layer, value_layer) = mpu.split_tensor_along_last_dim(
+            mixed_x_layer, 3
+        )
+
+        # =====================
+        # Attention
+        # =====================
+
+        # Collect shapes
+        # [b, np, sq, sk]
+        output_size = (
+            query_layer.size(1),  # b  = batch
+            query_layer.size(2),  # np = n_head / n_part
+            query_layer.size(0),  # sq = seqlen query
+            key_layer.size(0),    # sk = seqlen key
+        )
+        batch_size = output_size[0]
+        seqlen = output_size[2]
+        max_s = seqlen
+
+        # Reshape for flash attention
+        # [s, b, np, hn] -> [b, s, np, hn] -> [b * s, 1, np, hn]
+        query_layer = einops.rearrange(query_layer, "s b np hn -> (b s) 1 np hn", s=output_size[2])
+        key_layer = einops.rearrange(key_layer, "s b np hn -> (b s) 1 np hn", s=output_size[3])
+        value_layer = einops.rearrange(value_layer, "s b np hn -> (b s) 1 np hn", s=output_size[3])
+
+        # Packed q/k/v into [b * s, 3, np, hn]
+        qkv = torch.concat([query_layer, key_layer, value_layer], dim=1)
+
+        if exists(self.rotary_emb):
+            # Reshape for flash rope to expected shape: [batch, seqlen, 3, nheads, headdim]
+            qkv = einops.rearrange(qkv, "(b s) three np hn -> b s three np hn", s=seqlen)
+            qkv = self.rotary_emb(qkv)
+            # Re-pack qkv into [b * s, 3, np, hn]
+            qkv = einops.rearrange(qkv, "b s three np hn -> (b s) three np hn", s=seqlen)
+
+        cu_seqlens = torch.arange(
+            0,
+            (batch_size + 1) * seqlen,
+            step=seqlen,
+            dtype=torch.int32,
+            device=qkv.device,
+        )
+        output = self.flash_attention_function(
+            qkv,
+            cu_seqlens,
+            max_s,
+            self.dropout_p if self.training else 0.0,
+            softmax_scale=None,
+            causal=True,
+        )
+        # Reshape to Megatron ordering
+        # [b * sq, np, hn] -> [b, sq, np, hn] -> [b, np, sq, hn] -> [sq, b, np, hn]
+        context_layer = einops.rearrange(output, "(b s) np hn -> s b np hn", s=seqlen).contiguous()
+
+        # [sq, b, np, hn] --> [sq, b, hp]
+        new_context_layer_shape = context_layer.size()[:-2] + (
+            self.hidden_size_per_partition,
+        )
+        context_layer = context_layer.view(*new_context_layer_shape)
+
+        # =================
+        # Output. [sq, b, h]
+        # =================
+
+        output, bias = self.dense(context_layer)
+
+        # TODO: Support caching
+        # if self.use_cache:
+        #     output = [output, present]
+
+        return output, bias
+
+
 class ParallelTransformerLayer(nn.Module):
     """A single transformer layer.
 
@@ -631,17 +812,28 @@ class ParallelTransformerLayer(nn.Module):
             self.reduce = mpu.mappings.reduce_from_model_parallel_region
 
         # Self attention.
-        self.attention = ParallelSelfAttention(
-            neox_args=neox_args,
-            attention_mask_func=attention_mask_func,
-            init_method=init_method,
-            output_layer_init_method=output_layer_init_method,
-            layer_number=layer_number,
-            rpe=rpe,
-            use_cache=self.use_cache,
-            rotary=rotary,
-            parallel_output=self.gpt_j_residual,
-        )
+        # Use `FlashParallelSelfAttention` if xpos is enabled
+        if neox_args.rotary_scale_base is not None:
+            self.attention = FlashParallelSelfAttention(
+                neox_args=neox_args,
+                init_method=init_method,
+                output_layer_init_method=output_layer_init_method,
+                layer_number=layer_number,
+                use_cache=self.use_cache,
+                parallel_output=self.gpt_j_residual,
+            )
+        else:
+            self.attention = ParallelSelfAttention(
+                neox_args=neox_args,
+                attention_mask_func=attention_mask_func,
+                init_method=init_method,
+                output_layer_init_method=output_layer_init_method,
+                layer_number=layer_number,
+                rpe=rpe,
+                use_cache=self.use_cache,
+                rotary=rotary,
+                parallel_output=self.gpt_j_residual,
+            )
 
         # Layernorm on the output of the attention layer.
         # If GPT-J residuals are used, this is surpurfulous but leaving it in

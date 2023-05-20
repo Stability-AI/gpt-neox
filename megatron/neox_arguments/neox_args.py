@@ -287,6 +287,19 @@ class NeoXArgsModel(NeoXArgsTemplate):
     Base for rotary positional embedding
     """
 
+    rotary_interleaved: bool = False
+    """
+    Whether to use interleaved rotary positional embedding. If True, rotate pairs
+    of even and odd dimensions (GPT-J style) instead of 1st half and 2nd half
+    (GPT-NeoX style).
+    """
+
+    rotary_scale_base: int = None
+    """
+    If scale_base is not None, this implements XPos (Sun et al., https://arxiv.org/abs/2212.10554). 
+    A good value for this is 512
+    """
+
     init_method: Literal[
         "normal",
         "scaled_normal",
