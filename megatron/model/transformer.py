@@ -211,9 +211,7 @@ class ParallelSelfAttention(nn.Module):
 
         # Per attention head and per partition values.
         world_size = mpu.get_model_parallel_world_size()
-        # dim_per_shard = hidden_dim // world_size
         self.hidden_size_per_partition = mpu.divide(neox_args.hidden_size, world_size)
-        # dim_per_head = hidden_dim // num_heads
         self.hidden_size_per_attention_head = mpu.divide(
             neox_args.hidden_size, neox_args.num_attention_heads
         )
@@ -620,12 +618,13 @@ class FlashParallelSelfAttention(nn.Module):
         self.use_cache = use_cache
         assert self.use_cache is False, "Caching is not yet supported"
         self.layer_number = layer_number
+        self.attention_head_type = neox_args.attention_head_type
 
         # Per attention head and per partition values.
         world_size = mpu.get_model_parallel_world_size()
-        # dim_per_shard = hidden_dim // world_size
+        # `dim_per_shard = hidden_size // world_size`
         self.hidden_size_per_partition = mpu.divide(neox_args.hidden_size, world_size)
-        # dim_per_head = hidden_dim // num_heads
+        # Also known as `kv_channels` or `dim_per_head = hidden_size // num_heads`
         self.hidden_size_per_attention_head = mpu.divide(
             neox_args.hidden_size, neox_args.num_attention_heads
         )
@@ -634,13 +633,34 @@ class FlashParallelSelfAttention(nn.Module):
         )
         self.pos_emb = neox_args.pos_emb
 
-        self.query_key_value = mpu.ColumnParallelLinear(
-            neox_args=neox_args,
-            input_size=neox_args.hidden_size,
-            output_size=3 * neox_args.hidden_size,
-            gather_output=False,
-            init_method=init_method,
-        )
+        if self.attention_head_type == "multihead":
+            self.query_key_value = mpu.ColumnParallelLinear(
+                neox_args=neox_args,
+                input_size=neox_args.hidden_size,
+                output_size=3 * neox_args.hidden_size,
+                gather_output=False,
+                init_method=init_method,
+            )
+        elif self.attention_head_type == "multiquery":
+            self.query = mpu.ColumnParallelLinear(
+                neox_args=neox_args,
+                input_size=neox_args.hidden_size,
+                output_size=neox_args.hidden_size,
+                gather_output=False,
+                init_method=init_method,
+            )
+            # TODO: This doesn't need to be ColumnParallelLinear
+            self.key_value = mpu.ColumnParallelLinear(
+                neox_args=neox_args,
+                input_size=neox_args.hidden_size,
+                output_size=2 * self.hidden_size_per_attention_head,
+                gather_output=False,
+                init_method=init_method,
+            )
+        else:
+            raise ValueError(
+                f"Unrecognized attention head type: {neox_args.attention_head_type}"
+            )
 
         if neox_args.pos_emb == "rotary":
             if neox_args.rotary_pct == 1:
@@ -687,23 +707,50 @@ class FlashParallelSelfAttention(nn.Module):
         )
 
     def forward(self, hidden_states, attention_mask, layer_past=None):
+        """
+        Args:
+            hidden_states: Tensor of shape [s, b, h]
+        """
+
         # =====================
         # Query, Key, and Value
         # =====================
 
-        # Attention heads [sq, b, h] --> [sq, b, (np * 3 * hn)]
-        mixed_x_layer, _ = self.query_key_value(hidden_states)
+        if self.attention_head_type == "multihead":
+            # Attention heads [sq, b, h] --> [sq, b, (np * 3 * hn)]
+            mixed_x_layer, _ = self.query_key_value(hidden_states)
 
-        # [sq, b, (np * 3 * hn)] --> [sq, b, np, 3 * hn]
-        new_tensor_shape = mixed_x_layer.size()[:-1] + (
-            self.num_attention_heads_per_partition,
-            3 * self.hidden_size_per_attention_head,
-        )
-        mixed_x_layer = mixed_x_layer.view(*new_tensor_shape)
-        # [sq, b, np, 3 * hn] --> 3 [sq, b, np, hn]
-        (query_layer, key_layer, value_layer) = mpu.split_tensor_along_last_dim(
-            mixed_x_layer, 3
-        )
+            # [sq, b, (np * 3 * hn)] --> [sq, b, np, 3 * hn]
+            new_tensor_shape = mixed_x_layer.size()[:-1] + (
+                self.num_attention_heads_per_partition,
+                3 * self.hidden_size_per_attention_head,
+            )
+            mixed_x_layer = mixed_x_layer.view(*new_tensor_shape)
+            # [sq, b, np, 3 * hn] --> 3 [sq, b, np, hn]
+            (query_layer,
+             key_layer,
+             value_layer) = mpu.split_tensor_along_last_dim(mixed_x_layer, 3)
+        elif self.attention_head_type == "multiquery":
+            # Attention heads [sq, b, h] -> [sq, b, np * hn]
+            query_layer, _ = self.query(hidden_states)
+            # [sq, b, np * hn] -> [sq, b, np, hn]
+            new_tensor_shape = query_layer.size()[:-1] + (
+                self.num_attention_heads_per_partition,
+                self.hidden_size_per_attention_head,
+            )
+            query_layer = query_layer.view(*new_tensor_shape)
+
+            # Attention heads [sq, b, h] -> [sq, b, 2 * hn]
+            mixed_key_value, _ = self.key_value(hidden_states)
+            # [sq, b, 2 * hn] -> [sq, b, 1, 2 * hn]
+            new_tensor_shape = mixed_key_value.size()[:-1] + \
+                (1, 2 * self.hidden_size_per_attention_head) # Use 1 to expand later to query_layer size
+            mixed_key_value = mixed_key_value.view(*new_tensor_shape)
+            # [sq, b, 1, 2 * hn] -> 2 [sq, b, 1, hn]
+            key_layer, value_layer = mpu.split_tensor_along_last_dim(mixed_key_value, 2)
+            # Expand key and value layers to [sq, b, np, hn] as expected by flash-attn
+            key_layer = key_layer.expand_as(query_layer)
+            value_layer = value_layer.expand_as(query_layer)
 
         # =====================
         # Attention

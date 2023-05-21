@@ -186,6 +186,14 @@ class NeoXArgsModel(NeoXArgsTemplate):
         [[[`global`], n_layers]]
     """
 
+    attention_head_type: Literal["multihead", "multiquery"] = "multihead"
+    """
+    Type of attention head to use - choose from ["multihead", "multiquery"]
+    
+    multiquery: Attention head type that constrains different heads to share
+        a single set of keys and values. See: https://arxiv.org/abs/1911.02150
+    """
+
     sparsity_config: dict = None
     """
     Sparsity configuration dict as defined in https://www.deepspeed.ai/docs/config-json/#sparse-attention
@@ -808,7 +816,7 @@ class NeoXArgsTraining(NeoXArgsTemplate):
     """
     Timeout for heartbeats between ranks. If a rank does not send a heartbeat within this time, the program will exit.
     """
-    
+
     kill_timeout: int = 30
     """
     Timeout for killing a rank. If a rank does not exit within this time, the program will kill it.
