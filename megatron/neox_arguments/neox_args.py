@@ -187,7 +187,6 @@ class NeoXArgsModel(NeoXArgsTemplate):
     """
 
     sparsity_config: dict = None
-
     """
     Sparsity configuration dict as defined in https://www.deepspeed.ai/docs/config-json/#sparse-attention
 
@@ -820,7 +819,7 @@ class NeoXArgsTraining(NeoXArgsTemplate):
     Timeout for saving a checkpoint. If a rank does not save a checkpoint within this time, the program will exit.
     """
 
-    eval_interval_timeout: int = 1_200
+    eval_interval_timeout: int = 5_400
     """
     Timeout for running evaluation. If a rank does not finish evaluation within this time, the program will exit.
     """
