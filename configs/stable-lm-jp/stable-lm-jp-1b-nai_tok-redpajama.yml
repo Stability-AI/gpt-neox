@@ -49,7 +49,7 @@
     },
     "train_micro_batch_size_per_gpu": 4,
     "gradient_accumulation_steps": 4,
-    "eval_batch_size": 8,
+    "eval_batch_size": 4,
     "data-impl": "mmap",
     "checkpoint-activations": true,
     "checkpoint-num-layers": 1,
@@ -87,18 +87,18 @@
         0
     ],
     "eval_limit": [
-        1.0,
-        1.0,
-        1.0
+        0.1,
+        0.1,
+        0.1
     ],
     "use_wandb": true,
     "wandb_host": "https://stability.wandb.io",
     "wandb_team": "stability-llm",
     "wandb_project": "stable-lm-jp",
     "wandb_group": "1B",
-    "wandb_name": "1B.nai.redpajama.bs_4m.tp_1.dtype_int64",
-    "save": "/fsx/jp-llm/ckpts/1b_tok=nai_data=redpajama_bs=4m_tp=1_pp=1_init=wang-small-init_dtype=int64",
-    "load": "/fsx/jp-llm/ckpts/1b_tok=nai_data=redpajama_bs=4m_tp=1_pp=1_init=wang-small-init_dtype=int64",
+    "wandb_name": "1B.nai.redpajama.bs_8m.tp_1.dtype_int64",
+    "save": "/fsx/jp-llm/ckpts/1b_tok=nai_data=redpajama_bs=8m_tp=1_pp=1_init=wang-small-init_dtype=int64",
+    "load": "/fsx/jp-llm/ckpts/1b_tok=nai_data=redpajama_bs=8m_tp=1_pp=1_init=wang-small-init_dtype=int64",
     "tokenizer-type": "SPMTokenizer",
     "vocab-file": "/fsx/jp-llm/tokenizers/novelai-tokenizer/novelai.model",
     "log-interval": 10,
