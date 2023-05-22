@@ -140,8 +140,8 @@
   ],
 
   # tokenizer settings
-  "tokenizer-type": "SPMTokenizer",
-  "vocab-file": "/fsx/jp-llm/novelai.model",
+  "tokenizer-type": "MeCabTokenizer",
+  "vocab-file": "/fsx/jp-llm/tokenizers/polm-tokenizers-v2/wiki-unidic-lite-unigram.model",
 
   # log settings
   "log-interval": 10,
