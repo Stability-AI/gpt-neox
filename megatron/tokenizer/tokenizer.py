@@ -267,7 +267,7 @@ class MeCabTokenizer(AbstractTokenizer):
         }
 
     def tokenize(self, text):
-        mecab_toks = [node.surface for node in self.mecab(text)]
+        mecab_toks = [node.white_space + node.surface for node in self.mecab(text)]
         sp_toks = [self.sp.encode(tok) for tok in mecab_toks]
         # flatten it
         out = []
