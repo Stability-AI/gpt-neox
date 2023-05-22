@@ -982,6 +982,22 @@ Text Generation arguments
 
 
 
+- **eval_num_fewshot**: list
+
+    Default = None
+
+    Number of few shots for each task specified in `eval_tasks`
+
+
+
+- **eval_limit**: list
+
+    Default = None
+
+    Number of samples for each task specified in `eval_tasks`. Float number between [0, 1] will be interpreted as sample ratio.
+
+
+
 ## NeoXArgsTokenizer
 
 Tokenizer Arguments

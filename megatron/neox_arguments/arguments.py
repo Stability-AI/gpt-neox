@@ -298,8 +298,16 @@ class NeoXArgs(*BASE_CLASSES):
         group.add_argument(
             "--eval_num_fewshot",
             type=int,
-            default=0,
-            help="number of fewshots during evaluation"
+            nargs="+",
+            default=None,
+            help="number of fewshots for each eval task specified in --eval_tasks. could be a list of shots or a simple number."
+        )
+        group.add_argument(
+            "--eval_limit",
+            type=float,
+            nargs="+",
+            default=None,
+            help="limit for each eval task specified in --eval_tasks. float between [0, 1] will be interpreted as sample ratio"
         )
         group.add_argument(
             "--iteration",

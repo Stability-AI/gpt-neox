@@ -149,7 +149,16 @@ class EvalHarnessAdapter(GPT2LM):
             return (len(toks), x[0])
 
         reord = utils.Reorderer(requests, _collate)
-        for context, until in tqdm(reord.get_reordered(), "Running greedy generation"):
+        for req in tqdm(reord.get_reordered(), "Running greedy generation"):
+            if len(req) == 2:
+                context, until = req
+                max_gen_toks = self.max_gen_toks
+            elif len(req) == 3:
+                context, until, max_num_tokens = req
+                max_gen_toks = max_num_tokens
+            else:
+                raise NotImplementedError
+            
             if isinstance(until, str):
                 until = [until]
             stop_tokens = [self.tokenizer.encode(i) for i in until]
@@ -157,6 +166,7 @@ class EvalHarnessAdapter(GPT2LM):
                 text=context,
                 stop_tokens=stop_tokens,
                 recompute=self.neox_args.recompute,
+                maximum_tokens=max_gen_toks
             )
             if cont:
                 s = cont[0]["text"] or ""
@@ -468,7 +478,6 @@ def run_eval_harness(
     forward_step_fn,
     neox_args,
     eval_tasks=None,
-    num_fewshot=0,
     bootstrap_iters=0,
 ):
     print_rank_0("Running evaluation harness...")
@@ -477,7 +486,8 @@ def run_eval_harness(
     )
     return adapter.run_eval(
         eval_tasks=eval_tasks,
-        num_fewshot=num_fewshot,
+        num_fewshot=neox_args.eval_num_fewshot,
         bootstrap_iters=bootstrap_iters,
         use_cache=False,
+        limit=neox_args.eval_limit,
     )
