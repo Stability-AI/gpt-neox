@@ -67,7 +67,7 @@ export CPATH=\$CONDA_HOME/include:\$CPATH
 CWD=\$(pwd)
 mkdir -p \$CWD/nccl-logs/\$SLURM_JOB_ID  
 export NCCL_DEBUG_FILE=\$CWD/nccl-logs/\$SLURM_JOB_ID/debug.%h.%p
-export NCCL_DEBUG=info
+export NCCL_DEBUG=warn
 export NCCL_DEBUG_SUBSYS=all
 export NCCL_TREE_THRESHOLD=0
 export NCCL_PROTO=simple
