@@ -66,7 +66,7 @@ export CPATH=\$CONDA_HOME/include:\$CPATH
 ###########################################################
 export NCCL_DEBUG=warn
 # Uncomment the following lines to enable detailed NCCL debug logging
-# CWD=\$(pwd)
+CWD=\$(pwd)
 # mkdir -p \$CWD/nccl-logs/\$SLURM_JOB_ID  
 # export NCCL_DEBUG_FILE=\$CWD/nccl-logs/\$SLURM_JOB_ID/debug.%h.%p
 # export NCCL_DEBUG_SUBSYS=all  # Allows filtering the NCCL_DEBUG=INFO output based on subsystems
