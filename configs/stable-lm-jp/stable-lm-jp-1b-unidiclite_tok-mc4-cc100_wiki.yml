@@ -96,6 +96,16 @@
       "jnli-1.1-0.2",
       "marc_ja-1.1-0.2"
   ],
+  "eval_num_fewshot": [
+        3,
+        3,
+        3
+  ],
+  "eval_limit": [
+      0.25,
+      0.25,
+      0.25
+  ],
 
   # wandb settings
   "use_wandb": true,
