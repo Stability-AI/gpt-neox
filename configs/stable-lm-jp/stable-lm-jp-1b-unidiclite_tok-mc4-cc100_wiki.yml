@@ -92,7 +92,19 @@
   # early logarithmic save iters:
   # "extra-save-iters": [0,1,2,4,8,16,32,64,128,256,512,1024,2048],
   "eval_tasks": [
-    "jcommonsenseqa"
+      "jcommonsenseqa-1.1-0.2",
+      "jnli-1.1-0.2",
+      "marc_ja-1.1-0.2"
+  ],
+  "eval_num_fewshot": [
+        3,
+        3,
+        3
+  ],
+  "eval_limit": [
+      0.25,
+      0.25,
+      0.25
   ],
 
   # wandb settings
@@ -101,11 +113,11 @@
   "wandb_team": "stability-llm",
   "wandb_project": "stable-lm-jp",
   "wandb_group": "1B",
-  "wandb_name": "1B.nai.mc4_cc100_wiki.bs_4m.tp_1.dtype_int64",
+  "wandb_name": "1B.unidiclite.mc4_cc100_wiki.bs_4m.tp_1.dtype_int64",
 
   # checkpoint settings
-  "save": "/fsx/jp-llm/ckpts/1b_tok=nai_data=mc4-cc100-wiki_bs=4m_tp=1_pp=1_init=wang-small-init_dtype=int64",
-  "load": "/fsx/jp-llm/ckpts/1b_tok=nai_data=mc4-cc100-wiki_bs=4m_tp=1_pp=1_init=wang-small-init_dtype=int64",
+  "save": "/fsx/jp-llm/ckpts/1b_tok=unidiclite_data=mc4-cc100-wiki_bs=4m_tp=1_pp=1_init=wang-small-init_dtype=int64",
+  "load": "/fsx/jp-llm/ckpts/1b_tok=unidiclite_data=mc4-cc100-wiki_bs=4m_tp=1_pp=1_init=wang-small-init_dtype=int64",
 
   # data settings
   "train-data-paths": [
@@ -140,8 +152,8 @@
   ],
 
   # tokenizer settings
-  "tokenizer-type": "SPMTokenizer",
-  "vocab-file": "/fsx/jp-llm/novelai.model",
+  "tokenizer-type": "MeCabTokenizer",
+  "vocab-file": "/fsx/jp-llm/tokenizers/polm-tokenizers-v2/wiki-unidic-lite-unigram.model",
 
   # log settings
   "log-interval": 10,
