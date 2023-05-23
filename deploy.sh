@@ -64,11 +64,12 @@ export CPATH=\$CONDA_HOME/include:\$CPATH
 ###########################################################
 # CUDA/Torch Setup
 ###########################################################
-CWD=\$(pwd)
-mkdir -p \$CWD/nccl-logs/\$SLURM_JOB_ID  
-export NCCL_DEBUG_FILE=\$CWD/nccl-logs/\$SLURM_JOB_ID/debug.%h.%p
 export NCCL_DEBUG=warn
-export NCCL_DEBUG_SUBSYS=all
+# Uncomment the following lines to enable detailed NCCL debug logging
+# CWD=\$(pwd)
+# mkdir -p \$CWD/nccl-logs/\$SLURM_JOB_ID  
+# export NCCL_DEBUG_FILE=\$CWD/nccl-logs/\$SLURM_JOB_ID/debug.%h.%p
+# export NCCL_DEBUG_SUBSYS=all  # Allows filtering the NCCL_DEBUG=INFO output based on subsystems
 export NCCL_TREE_THRESHOLD=0
 export NCCL_PROTO=simple
 # Network issues without the following two NCCL vars set; See https://github.com/NVIDIA/nccl/issues/676
