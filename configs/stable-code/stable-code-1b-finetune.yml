@@ -104,8 +104,8 @@
   "save": "/fsx/ckpts/1b_tok=neox_data=stable-code-finetune",
   "load": "/fsx/ckpts/1b_tok=neox_data=stable-code-finetune",
   # "no_load_optim": true,
-  # "iteration": 0,
-  "finetune": true,
+  "iteration": 128000,
+  # "finetune": true,
 
   # data settings
   # (AWS East paths)
@@ -511,8 +511,8 @@
   "wandb_project": "stable-code",
   "wandb_group": "1B",
   "wandb_name": "1B.neox.stable-code-finetune",
-  # "wandb_id": "",
-  # "wandb_resume": "must",
+  "wandb_id": "1g7j7b5g",
+  "wandb_resume": "must",
 
   # multi-node launcher
   "launcher": "slurm",

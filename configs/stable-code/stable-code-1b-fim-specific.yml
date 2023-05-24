@@ -1,0 +1,191 @@
+{
+  # parallelism settings
+  "pipe-parallel-size": 1,
+  "model-parallel-size": 1,
+
+  # model settings
+  "num-layers": 24,
+  "hidden-size": 2048,
+  "num-attention-heads": 16,
+  "seq-length": 4096,
+  "max-position-embeddings": 4096,
+
+  # architecture design
+  "norm": "layernorm",
+  "pos-emb": "rotary",
+  "rotary_pct": 0.25,
+  "activation": "gelu",
+  "no-weight-tying": true,
+  "gpt_j_residual": true,
+  "output_layer_parallelism": "column",
+
+  # init methods
+  "init_method": "small_init",
+  "output_layer_init_method": "wang_init",
+
+  # fused ops
+  "scaled-upper-triang-masked-softmax-fusion": true,
+  "bias-gelu-fusion": true,
+  "attention-config": [[["flash"], 24]],
+
+  # optimizer settings
+  "optimizer": {
+    "type": "Adam",
+    "params": {
+      "lr": 3.4e-4,
+      "betas": [0.9, 0.95],
+      "eps": 1.0e-8
+    }
+  },
+  "min_lr": 3.4e-5,
+
+  # for all zero_optimization options, see https://www.deepspeed.ai/docs/config-json/#zero-optimizations-for-fp16-training
+  "zero_optimization": {
+    "stage": 1,
+    "allgather_partitions": true,
+    "allgather_bucket_size": 1260000000,
+    "overlap_comm": true,
+    "reduce_scatter": true,
+    "reduce_bucket_size": 1260000000,
+    "contiguous_gradients": true,
+    "cpu_offload": false
+  },
+
+  # batch / data settings
+  "train_micro_batch_size_per_gpu": 8,
+  "gradient_accumulation_steps": 1,
+  "eval_batch_size": 4,
+  "data-impl": "mmap",
+
+  # activation checkpointing
+  "checkpoint-activations": true,
+  "checkpoint-num-layers": 1,
+  "partition-activations": true,
+  "synchronize-each-layer": true,
+
+  # regularization
+  "gradient_clipping": 1.0,
+  "weight-decay": 0.1,
+  "hidden-dropout": 0,
+  "attention-dropout": 0,
+
+  # precision settings
+  "bf16": { "enabled": true },
+  "precision": "bfloat16",
+  # "fp16": {
+  #   "fp16": true,
+  #   "enabled": true,
+  #   "loss_scale": 0,
+  #   "loss_scale_window": 1000,
+  #   "initial_scale_power": 12,
+  #   "hysteresis": 2,
+  #   "min_loss_scale": 1
+  # },
+
+  # misc. training settings
+  # 66k iters ~= 550B tokens at bs=8.3M
+  # 120k iters = 1T tokens at bs=8.3M
+  # 240k iters = 1T tokens at bs=4.1M
+  # 180k iters = 1.5T tokens at bs=8.3M
+  # 180k iters ~= 700B tokens at bs=4.1M
+  # 360k iters = 3T tokens at bs=4.1M
+  "train-iters": 120000, # 120k iters ~= 500B (3 epochs) tokens at bs=4.1M
+  "lr-decay-iters": 120000,
+  "distributed-backend": "nccl",
+  "lr-decay-style": "cosine",
+  "warmup": 0.01,
+  "checkpoint-factor": 1000,
+  # 1 more than checkpoint-factor to avoid skipping evals if `evaluate` fails
+  "eval-interval": 1001,
+  "eval-iters": 10,
+  # early logarithmic save iters:
+  # "extra-save-iters": [0,1,2,4,8,16,32,64,128,256,512,1024,2048],
+  "eval_tasks": ["lambada_openai", "piqa", "sciq"],
+
+  # checkpoint settings
+  "save": "/fsx/ckpts/1b_tok=neox_data=stable-code-fim-specific",
+  "load": "/fsx/ckpts/1b_tok=neox_data=stable-code-fim-specific",
+  # "no_load_optim": true,
+  # "iteration": 66000,
+  # "finetune": true,
+
+  # data settings
+  # (AWS East paths)
+  # 173,184,246,478 tokens in total
+  # languages selected from stackoverflow dev survey 2022 https://survey.stackoverflow.co/2022/#technology-most-popular-technologies
+  "train-data-paths": [
+    "/fsx/shared/the-stack-dedup-tokenized/python/tokenized-merged",
+    "/fsx/shared/the-stack-dedup-tokenized/typescript/tokenized-merged",
+    "/fsx/shared/the-stack-dedup-tokenized/java/tokenized-merged",
+    "/fsx/shared/the-stack-dedup-tokenized/cpp/tokenized-merged",
+    "/fsx/shared/the-stack-dedup-tokenized/php/tokenized-merged",
+    "/fsx/shared/the-stack-dedup-tokenized/c/tokenized-merged"
+  ],
+  "train-data-weights": [
+    0.17012986655078272,
+    0.09012752114253536,
+    0.24243067656464629,
+    0.1361608406743597,
+    0.19159437660061693,
+    0.169556718467059
+  ],
+  "valid-data-paths": [
+    "/fsx/shared/the-stack-dedup-tokenized/python/tokenized-merged",
+    "/fsx/shared/the-stack-dedup-tokenized/typescript/tokenized-merged",
+    "/fsx/shared/the-stack-dedup-tokenized/java/tokenized-merged",
+    "/fsx/shared/the-stack-dedup-tokenized/cpp/tokenized-merged",
+    "/fsx/shared/the-stack-dedup-tokenized/php/tokenized-merged",
+    "/fsx/shared/the-stack-dedup-tokenized/c/tokenized-merged"
+  ],
+  "valid-data-weights": [
+    0.17012986655078272,
+    0.09012752114253536,
+    0.24243067656464629,
+    0.1361608406743597,
+    0.19159437660061693,
+    0.169556718467059
+  ],
+  "test-data-paths": [
+    "/fsx/shared/the-stack-dedup-tokenized/python/tokenized-merged",
+    "/fsx/shared/the-stack-dedup-tokenized/typescript/tokenized-merged",
+    "/fsx/shared/the-stack-dedup-tokenized/java/tokenized-merged",
+    "/fsx/shared/the-stack-dedup-tokenized/cpp/tokenized-merged",
+    "/fsx/shared/the-stack-dedup-tokenized/php/tokenized-merged",
+    "/fsx/shared/the-stack-dedup-tokenized/c/tokenized-merged"
+  ],
+  "test-data-weights": [
+    0.17012986655078272,
+    0.09012752114253536,
+    0.24243067656464629,
+    0.1361608406743597,
+    0.19159437660061693,
+    0.169556718467059
+  ],
+  
+  # tokenizer settings
+  "tokenizer-type": "HFTokenizer",
+  "vocab-file": "/fsx/pile/20B_tokenizer_fim.json",
+
+  # fim settings
+  "fim-rate": 0.5,
+  "fim-spm-rate": 0.5,
+  "fim-level": "char",
+
+  # log settings
+  "log-interval": 10,
+  "steps_per_print": 10,
+  "wall_clock_breakdown": true,
+
+  "use_wandb": true,
+  "wandb_host": "https://stability.wandb.io",
+  "wandb_team": "stability-llm",
+  "wandb_project": "stable-code",
+  "wandb_group": "1B",
+  "wandb_name": "1B.neox.stable-code-fim-specific",
+  # "wandb_id": "1g7j7b5g",
+  # "wandb_resume": "must",
+
+  # multi-node launcher
+  "launcher": "slurm",
+  "deepspeed_slurm": true
+}

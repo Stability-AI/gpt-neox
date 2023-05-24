@@ -1,3 +1,6 @@
 [submodule "apex"]
 	path = apex
 	url = https://github.com/NVIDIA/apex.git
+[submodule "evaluations/bigcode-evaluation-harness"]
+	path = evaluations/bigcode-evaluation-harness
+	url = https://github.com/bigcode-project/bigcode-evaluation-harness.git

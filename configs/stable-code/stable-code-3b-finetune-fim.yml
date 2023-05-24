@@ -1,12 +1,12 @@
 {
-  # parallelism settings
+# parallelism settings
   "pipe-parallel-size": 1,
-  "model-parallel-size": 1,
+  "model-parallel-size": 4,
 
   # model settings
-  "num-layers": 24,
-  "hidden-size": 2048,
-  "num-attention-heads": 16,
+  "num-layers": 16,
+  "hidden-size": 4096,
+  "num-attention-heads": 32,
   "seq-length": 4096,
   "max-position-embeddings": 4096,
 
@@ -26,18 +26,18 @@
   # fused ops
   "scaled-upper-triang-masked-softmax-fusion": true,
   "bias-gelu-fusion": true,
-  "attention-config": [[["flash"], 24]],
+  "attention-config": [[["flash"], 16]],
 
   # optimizer settings
   "optimizer": {
     "type": "Adam",
     "params": {
-      "lr": 3.4e-4,
+      "lr": 3.2e-4,
       "betas": [0.9, 0.95],
-      "eps": 1.0e-8
-    }
+      "eps": 1.0e-6
+    },
   },
-  "min_lr": 3.4e-5,
+  "min_lr": 3.2e-5,
 
   # for all zero_optimization options, see https://www.deepspeed.ai/docs/config-json/#zero-optimizations-for-fp16-training
   "zero_optimization": {
@@ -48,13 +48,13 @@
     "reduce_scatter": true,
     "reduce_bucket_size": 1260000000,
     "contiguous_gradients": true,
-    "cpu_offload": false
+    "cpu_offload": false,
   },
 
   # batch / data settings
   "train_micro_batch_size_per_gpu": 4,
-  "gradient_accumulation_steps": 2,
-  "eval_batch_size": 4,
+  "gradient_accumulation_steps": 1,
+  "eval_batch_size": 2,
   "data-impl": "mmap",
 
   # activation checkpointing
@@ -64,7 +64,7 @@
   "synchronize-each-layer": true,
 
   # regularization
-  "gradient_clipping": 1.0,
+  "gradient_clipping": 0.5,
   "weight-decay": 0.1,
   "hidden-dropout": 0,
   "attention-dropout": 0,
@@ -80,6 +80,10 @@
     "min_loss_scale": 1
   },
 
+  # precision settings
+  # "bf16": { "enabled": true },
+  # "precision": "bfloat16",
+
   # misc. training settings
   # 66k iters ~= 550B tokens at bs=8.3M
   # 120k iters = 1T tokens at bs=8.3M
@@ -87,7 +91,7 @@
   # 180k iters = 1.5T tokens at bs=8.3M
   # 180k iters ~= 700T tokens at bs=4.1M
   # 360k iters = 3T tokens at bs=4.1M
-  "train-iters": 180000, # 180k iters ~= 700B tokens at bs=4.1M
+  "train-iters": 180000, # 180k iters ~= 700B tokens at bs=4.1M as gas is not considered
   "lr-decay-iters": 180000,
   "distributed-backend": "nccl",
   "lr-decay-style": "cosine",
@@ -101,9 +105,11 @@
   "eval_tasks": ["lambada_openai", "piqa", "sciq"],
 
   # checkpoint settings
-  "save": "/fsx/ckpts/1b_tok=neox_data=stable-code-fim",
-  "load": "/fsx/ckpts/1b_tok=neox_data=stable-code-fim",
-  # "iteration": 66000,
+  "save": "/fsx/ckpts/3b_tok=neox_data=stable-code-finetune-fim",
+  "load": "/fsx/ckpts/3b_tok=neox_data=stable-code-finetune-fim",
+  # "no_load_optim": true,
+  # "iteration": 7000,
+  "finetune": true,
 
   # data settings
   # (AWS East paths)
@@ -132,8 +138,8 @@
     "/fsx/shared/the-stack-dedup-tokenized/swift/tokenized-merged",
     "/fsx/shared/the-stack-dedup-tokenized/r/tokenized-merged",
     "/fsx/shared/the-stack-dedup-tokenized/visual-basic/tokenized-merged",
-    "/fsx/shared/the-stack-dedup-tokenized/matlab/tokenized-merged",
-    "/fsx/shared/the-stack-dedup-tokenized/m/tokenized-merged",
+    # "/fsx/shared/the-stack-dedup-tokenized/matlab/tokenized-merged", # 23
+    # "/fsx/shared/the-stack-dedup-tokenized/m/tokenized-merged",
     "/fsx/shared/the-stack-dedup-tokenized/lua/tokenized-merged",
     "/fsx/shared/the-stack-dedup-tokenized/groovy/tokenized-merged",
     "/fsx/shared/the-stack-dedup-tokenized/scala/tokenized-merged",
@@ -197,8 +203,8 @@
     0.0036930980136394244, 
     0.00021146754725414298, 
     0.0007582586830687458, 
-    4.457845142014597e-05, 
-    1.4252913741136437e-07, 
+    # 4.457845142014597e-05, # matlab
+    # 1.4252913741136437e-07, # m 
     0.0022968240214857245, 
     0.0005678756905773459, 
     0.0030796002217715734, 
@@ -260,8 +266,8 @@
     "/fsx/shared/the-stack-dedup-tokenized/swift/tokenized-merged",
     "/fsx/shared/the-stack-dedup-tokenized/r/tokenized-merged",
     "/fsx/shared/the-stack-dedup-tokenized/visual-basic/tokenized-merged",
-    "/fsx/shared/the-stack-dedup-tokenized/matlab/tokenized-merged",
-    "/fsx/shared/the-stack-dedup-tokenized/m/tokenized-merged",
+    # "/fsx/shared/the-stack-dedup-tokenized/matlab/tokenized-merged",
+    # "/fsx/shared/the-stack-dedup-tokenized/m/tokenized-merged",
     "/fsx/shared/the-stack-dedup-tokenized/lua/tokenized-merged",
     "/fsx/shared/the-stack-dedup-tokenized/groovy/tokenized-merged",
     "/fsx/shared/the-stack-dedup-tokenized/scala/tokenized-merged",
@@ -325,8 +331,8 @@
     0.0036930980136394244, 
     0.00021146754725414298, 
     0.0007582586830687458, 
-    4.457845142014597e-05, 
-    1.4252913741136437e-07, 
+    # 4.457845142014597e-05, 
+    # 1.4252913741136437e-07, 
     0.0022968240214857245, 
     0.0005678756905773459, 
     0.0030796002217715734, 
@@ -388,8 +394,8 @@
     "/fsx/shared/the-stack-dedup-tokenized/swift/tokenized-merged",
     "/fsx/shared/the-stack-dedup-tokenized/r/tokenized-merged",
     "/fsx/shared/the-stack-dedup-tokenized/visual-basic/tokenized-merged",
-    "/fsx/shared/the-stack-dedup-tokenized/matlab/tokenized-merged",
-    "/fsx/shared/the-stack-dedup-tokenized/m/tokenized-merged",
+    # "/fsx/shared/the-stack-dedup-tokenized/matlab/tokenized-merged",
+    # "/fsx/shared/the-stack-dedup-tokenized/m/tokenized-merged",
     "/fsx/shared/the-stack-dedup-tokenized/lua/tokenized-merged",
     "/fsx/shared/the-stack-dedup-tokenized/groovy/tokenized-merged",
     "/fsx/shared/the-stack-dedup-tokenized/scala/tokenized-merged",
@@ -453,8 +459,8 @@
     0.0036930980136394244, 
     0.00021146754725414298, 
     0.0007582586830687458, 
-    4.457845142014597e-05, 
-    1.4252913741136437e-07, 
+    # 4.457845142014597e-05, 
+    # 1.4252913741136437e-07, 
     0.0022968240214857245, 
     0.0005678756905773459, 
     0.0030796002217715734, 
@@ -499,7 +505,6 @@
   "vocab-file": "/fsx/pile/20B_tokenizer_fim.json",
 
   # fim settings
-  # "extra-sentinel-tokens": 3,
   "fim-rate": 0.5,
   "fim-spm-rate": 0.5,
   "fim-level": "char",
@@ -513,9 +518,9 @@
   "wandb_host": "https://stability.wandb.io",
   "wandb_team": "stability-llm",
   "wandb_project": "stable-code",
-  "wandb_group": "1B",
-  "wandb_name": "1B.neox.stable-code-fim",
-  "wandb_id": "3fotqxwg",
+  "wandb_group": "3B",
+  "wandb_name": "3B.neox.stable-code-finetune-fim",
+  "wandb_id": "dnk7ivjk",
   "wandb_resume": "must",
 
   # multi-node launcher
