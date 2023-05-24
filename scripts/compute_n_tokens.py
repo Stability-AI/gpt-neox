@@ -13,6 +13,7 @@ from multiprocessing import Pool
 
 
 NOVELAI = "/fsx/home-mkshing/models/novelai-tokenizer"
+MAX_SAVE_LINES_FOR_UNK = 5000
 
 
 def convert_novelai_to_hf():
@@ -86,7 +87,6 @@ def main():
         input_files = glob.glob("/fsx/home-polm/data/en-data/*2.txt")
     else:
         input_files = glob.glob("/fsx/home-polm/data/doc_data/*.txt")
-    MAX_SAVE_LINES_FOR_UNK = 5000
     OUTPUT_DIR = "logs"
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
