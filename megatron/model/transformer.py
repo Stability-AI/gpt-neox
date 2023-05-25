@@ -322,16 +322,15 @@ class ParallelSelfAttention(nn.Module):
             if self.use_flash_attention:
                 from megatron.model.flash_attention import (
                     flash_attn_unpadded_qkvpacked_func_cuda,
+                    flash_attn_unpadded_kvpacked_func_cuda,
                 )
 
                 self.flash_attention_function = flash_attn_unpadded_qkvpacked_func_cuda
+                self.flash_attention_function_kv_cached = flash_attn_unpadded_kvpacked_func_cuda
                 if self.pos_emb == "alibi":
                     raise ValueError(
                         "Flash attention is currently not compatible with AliBi positional embeddings. Use sinuisoidal, learned, or rotary embeddings instead."
                     )
-                from megatron.model.flash_attention import (
-                    flash_attn_unpadded_qkvpacked_func_cuda,
-                )
 
             else:
                 self.scale_mask_softmax = FusedScaleMaskSoftmax(
@@ -577,27 +576,66 @@ class ParallelSelfAttention(nn.Module):
         )
 
         # Combined q/k/v into [b * s, 3, np, hn].
-        qkv = torch.concat([query_layer, key_layer, value_layer], dim=1)
+        if query_layer.size(0) == key_layer.size(0):
+            qkv = torch.concat([query_layer, key_layer, value_layer], dim=1)
 
-        batch_size = output_size[0]
-        seqlen = output_size[2]
-        max_s = seqlen
+            batch_size = output_size[0]
+            seqlen = output_size[2]
+            max_s = seqlen
 
-        cu_seqlens = torch.arange(
-            0,
-            (batch_size + 1) * seqlen,
-            step=seqlen,
-            dtype=torch.int32,
-            device=qkv.device,
-        )
-        output = self.flash_attention_function(
-            qkv,
-            cu_seqlens,
-            max_s,
-            self.dropout_p if self.training else 0.0,
-            softmax_scale=None,
-            causal=True,
-        )
+            cu_seqlens = torch.arange(
+                0,
+                (batch_size + 1) * seqlen,
+                step=seqlen,
+                dtype=torch.int32,
+                device=qkv.device,
+            )
+
+            output = self.flash_attention_function(
+                qkv,
+                cu_seqlens,
+                max_s,
+                self.dropout_p if self.training else 0.0,
+                softmax_scale=None,
+                causal=True,
+            )
+
+        else:
+            query_layer = query_layer.squeeze(1)
+            kv = torch.concat([key_layer, value_layer], dim=1)
+
+            batch_size = output_size[0]
+            max_seqlen_q = output_size[2]
+            max_seqlen_k = output_size[3]
+
+            cu_seqlens_q = torch.arange(
+                0,
+                (batch_size + 1) * max_seqlen_q,
+                step=max_seqlen_q,
+                dtype=torch.int32,
+                device=query_layer.device,
+            )
+
+            cu_seqlens_k = torch.arange(
+                0,
+                (batch_size + 1) * max_seqlen_k,
+                step=max_seqlen_k,
+                dtype=torch.int32,
+                device=key_layer.device,
+            )
+
+            output = self.flash_attention_function_kv_cached(
+                query_layer,
+                kv,
+                cu_seqlens_q,
+                cu_seqlens_k,
+                max_seqlen_q,
+                max_seqlen_k,
+                self.dropout_p if self.training else 0.0,
+                softmax_scale=None,
+                causal=True,
+            )
+
         # [b * sq, np, hn] -> [b, sq, np, hn]
         matmul_result = output.view(
             output_size[0], output_size[2], output.shape[1], output.shape[2]
