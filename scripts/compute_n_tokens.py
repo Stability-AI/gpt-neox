@@ -104,7 +104,7 @@ def main():
     final_summary["unk_lines"] = final_summary["unk_lines"][:MAX_SAVE_LINES_FOR_UNK]
 
     with open(outfile, "w", encoding="utf-8-sig") as fw:
-        fw.write(json.dumps(summary, indent=4))
+        fw.write(json.dumps(final_summary, indent=4))
 
 if __name__ == "__main__":
     main()
