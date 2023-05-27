@@ -83,18 +83,6 @@
   "eval-tasks": ["piqa"],
 
   "data-path": "data/enwik8/enwik8_text_document",
-
-  # "tokenizer_type": "TiktokenTokenizer",
-  # "vocab-file": "cl100k_base",
-
-  # Test on a single partition of the dataset
-  # "train-data-paths": ["/fsx/proj-stablegpt/pilev2_neox/ai4code_nbs/ai4code_nbs_input_ids_document"],
-  # "train-data-weights": [1.0],
-  # "valid-data-paths": ["/fsx/proj-stablegpt/pilev2_neox/ai4code_nbs/ai4code_nbs_input_ids_document"],
-  # "valid-data-weights": [1.0],
-  # "test-data-paths": ["/fsx/proj-stablegpt/pilev2_neox/ai4code_nbs/ai4code_nbs_input_ids_document"],
-  # "test-data-weights": [1.0],
-
   "vocab-file": "data/gpt2-vocab.json",
   "merge-file": "data/gpt2-merges.txt",
 
