@@ -144,7 +144,6 @@ export PYTORCH_CUDA_ALLOC_CONF='max_split_size_mb:256'
 
 TRAIN_PATH=\$CWD
 cd \$TRAIN_PATH
-wandb login --relogin --host https://stability.wandb.io local-edea3863613ef71e1ef7532673fdf4b46bc5ffd7
 git config --global --add safe.directory \$TRAIN_PATH
 
 echo "$0 = \$0"
