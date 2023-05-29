@@ -21,7 +21,7 @@ while true ; do
     esac
 done
 
-mkdir -p sbatches
+mkdir -p sbatches logs
 cat << EOF > sbatches/sbatch_runner_$jobname.sh
 #!/bin/bash
 #SBATCH --account="stablegpt"
