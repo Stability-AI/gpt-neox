@@ -182,7 +182,17 @@ def init_wandb(neox_args):
                 flush=True,
             )
         if neox_args.launcher == "slurm" and neox_args.slurm_job_id is None:
+            assert os.environ["NEOX_WORKING_DIR"] is not None, "NEOX_WORKING_DIR not set"
+            assert os.environ["NEOX_LAUNCH_CMD"] is not None, "NEOX_LAUNCH_CMD not set"
+            assert os.environ["NEOX_LAUNCH_CONFIG_PATH"] is not None, "NEOX_LAUNCH_CONFIG_PATH not set"
+            assert os.environ["NEOX_LAUNCH_JOB_NAME"] is not None, "NEOX_LAUNCH_JOB_NAME not set"
+            assert os.environ["NEOX_LAUNCH_NODES"] is not None, "NEOX_LAUNCH_NODES not set"
             assert os.environ["SLURM_JOB_ID"] is not None, "SLURM_JOB_ID not set"
+            neox_args.update_value("neox_working_dir",os.environ["NEOX_WORKING_DIR"])
+            neox_args.update_value("neox_launch_cmd",os.environ["NEOX_LAUNCH_CMD"])
+            neox_args.update_value("neox_launch_config_path",os.environ["NEOX_LAUNCH_CONFIG_PATH"])
+            neox_args.update_value("neox_launch_job_name",os.environ["NEOX_LAUNCH_JOB_NAME"])
+            neox_args.update_value("neox_working_dir",os.environ["NEOX_LAUNCH_NODES"])
             neox_args.update_value("slurm_job_id", os.environ["SLURM_JOB_ID"])
         wandb.config.update(neox_args.all_config, allow_val_change=True)
 
