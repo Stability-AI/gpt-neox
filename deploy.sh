@@ -53,7 +53,6 @@ HOME=/fsx/home-\$(whoami)
 CUDNN_HOME=/fsx/quentin/cudnn-linux-x86_64-8.6.0.163_cuda11-archive
 export LD_LIBRARY_PATH=\$CUDNN_HOME/lib:\$LD_LIBRARY_PATH
 export CPATH=\$CUDNN_HOME/include:\$CPATH
-
 CONDA_HOME=/fsx/home-\$(whoami)/miniconda3/envs/stable-neox-env
 export PATH=\$CONDA_HOME/bin:\$PATH
 export LD_LIBRARY_PATH=\$CONDA_HOME/lib:\$LD_LIBRARY_PATH
@@ -141,6 +140,16 @@ ds_report
 ###########################################################
 export WANDB_MODE="online"
 export PYTORCH_CUDA_ALLOC_CONF='max_split_size_mb:256'
+
+###########################################################
+# Run launch vars Setup
+###########################################################
+export NEOX_WORKING_DIR=$(pwd)
+export NEOX_LAUNCH_CMD="bash deploy.sh -c ${config} -j ${jobname} -n ${nodes} "
+export NEOX_LAUNCH_CONFIG_PATH=${config}
+export NEOX_LAUNCH_JOB_NAME=${jobname}
+export NEOX_LAUNCH_NODES=${nodes}
+
 
 TRAIN_PATH=\$CWD
 cd \$TRAIN_PATH
