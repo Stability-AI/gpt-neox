@@ -1,0 +1,27 @@
+cache_dir: "/path/to/.cache"
+data_path:
+  - "fujiki/japanese_alpaca_data"
+  - "kunishou/databricks-dolly-15k-ja"
+train_size: 0.98
+max_text_len: 1024
+tokenizer:
+  tokenizer_name_or_path: "/PATH/TO/nai-hf-tokenizer/"
+  use_fast: False
+model_path: "/PATH/TO/1b-ja50-rp50-460b"
+trainer: "text"
+train_args:
+  output_dir: "/PATH/TO/outputs/stablelm-jp-0.1.3"
+  num_train_epochs: 3
+  per_device_train_batch_size: 8
+  per_device_eval_batch_size: 8
+  fp16: True
+  learning_rate: 1.0e-7
+  lr_scheduler_type: "constant"
+  gradient_accumulation_steps: 8
+  gradient_checkpointing: True
+  evaluation_strategy: "steps"
+  eval_steps: 100
+  logging_dir: "/PATH/TO/outputs/stablelm-jp-0.1.3"
+  logging_steps: 100
+  save_strategy: "epoch"
+  save_total_limit: 3

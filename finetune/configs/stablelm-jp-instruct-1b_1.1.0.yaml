@@ -1,0 +1,29 @@
+cache_dir: "/PATH/TO/.cache"
+data_path: "fujiki/japanese_alpaca_data"
+train_size: 0.98
+max_text_len: 1024
+tokenizer:
+  tokenizer_name_or_path: "/PATH/TO/nai-hf-tokenizer/"
+  use_fast: False
+model_path: "/PATH/TO/1b-ja50-rp50-460b"
+trainer: "text"
+train_args:
+  output_dir: "/PATH/TO/stablelm-jp-instruct-1b_1.1.0"
+  num_train_epochs: 3
+  per_device_train_batch_size: 8
+  per_device_eval_batch_size: 8
+  fp16: True
+  learning_rate: 1.0e-7
+  lr_scheduler_type: "constant"
+  # adam_beta2: 0.99
+  # weight_decay: 0.01
+  # gradient_accumulation_steps: 16
+  gradient_checkpointing: True
+  # warmup_steps: 100
+  evaluation_strategy: "steps"
+  eval_steps: 100
+  logging_dir: "/PATH/TO/stablelm-jp-instruct-1b_1.1.0"
+  logging_steps: 100
+  save_strategy: "epoch"
+  save_total_limit: 3
+save_dir: "/PATH/TO/stablelm-jp-instruct-1b_1.1.0"

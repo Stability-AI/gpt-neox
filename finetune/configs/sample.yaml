@@ -1,0 +1,29 @@
+cache_dir: "/path/to/.cache"  # TODO: change here
+tokenizer:
+  tokenizer_name_or_path: "rinna/japanese-gpt-1b"
+  use_fast: False
+model_path: "rinna/japanese-gpt-1b"  # TODO: change here
+save_dir: "/path/to/output/directory/rinna-1b-instruct"
+train_args:
+  output_dir: "/path/to/output/directory/rinna-1b-instruct"  # TODO: change here
+  num_train_epochs: 2
+  per_device_train_batch_size: 8
+  per_device_eval_batch_size: 8
+  fp16: True
+  learning_rate: 1.0e-7
+  lr_scheduler_type: "constant"
+  # adam_beta2: 0.99
+  # weight_decay: 0.01
+  # gradient_accumulation_steps: 16
+  gradient_checkpointing: True
+  # warmup_steps: 100
+  evaluation_strategy: "steps"
+  eval_steps: 100
+  logging_dir: "/path/to/output/directory/rinna-1b-instruct"  # TODO: change here
+  logging_steps: 100
+  save_strategy: "epoch"
+  save_total_limit: 1
+data_path: "fujiki/japanese_alpaca_data"
+train_size: 0.98
+trainer: "text"
+max_text_len: 1024
