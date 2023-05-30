@@ -181,6 +181,17 @@ def init_wandb(neox_args):
                 "Skipping wandb. Execute `wandb login` on local or main node machine to enable.",
                 flush=True,
             )
+        #CHANGE(reshinth) - To skip error on non-existent run name
+        except wandb.Error as e:
+            if "You must call wandb.init() before" in error_message:
+                print(
+                    f"Couldn't find {kwargs['resume']}, skipping resuming feature",
+                    flush=True )
+                kwargs.pop("resume")
+                kwargs.pop("id")
+                wandb.init(**kwargs)
+
+
         if neox_args.launcher == "slurm" and neox_args.slurm_job_id is None:
             assert os.environ["NEOX_WORKING_DIR"] is not None, "NEOX_WORKING_DIR not set"
             assert os.environ["NEOX_LAUNCH_CMD"] is not None, "NEOX_LAUNCH_CMD not set"
