@@ -30,3 +30,4 @@ sqlitedict
 torch>=1.7
 tqdm-multiprocess
 zstandard
+wandb

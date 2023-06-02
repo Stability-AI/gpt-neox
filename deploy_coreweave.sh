@@ -26,11 +26,10 @@ cat << EOF > sbatches/sbatch_runner_$jobname.sh
 #!/bin/bash
 #SBATCH --account="stablegpt"
 #SBATCH --job-name=${jobname}
-#SBATCH --partition=g40
+#SBATCH --partition=a100-cu117
 #SBATCH --nodes=$nodes # Set > 1 for multi-node
 #SBATCH --ntasks-per-node=8
-#SBATCH --cpus-per-task=12
-#SBATCH --mem-per-cpu=11G
+#SBATCH --hint=nomultithread         # We get physical cores not logical
 #SBATCH --gres=gpu:8
 #SBATCH --exclusive
 #SBATCH --output=logs/%x_%j.out
@@ -43,27 +42,18 @@ ABORTED=134
 REPEAT_COUNTER=\${1:-0}
 MAX_RUNS=2
 
-source /etc/profile.d/modules.sh
-module load openmpi cuda/11.7
-
 ###########################################################
 # Pre-load
 ###########################################################
-HOME=/fsx/home-\$(whoami)
-CUDNN_HOME=/fsx/quentin/cudnn-linux-x86_64-8.6.0.163_cuda11-archive
-export LD_LIBRARY_PATH=\$CUDNN_HOME/lib:\$LD_LIBRARY_PATH
-export CPATH=\$CUDNN_HOME/include:\$CPATH
-CONDA_HOME=/fsx/home-\$(whoami)/miniconda3/envs/stable-neox-env
-export PATH=\$CONDA_HOME/bin:\$PATH
-export LD_LIBRARY_PATH=\$CONDA_HOME/lib:\$LD_LIBRARY_PATH
-export CPATH=\$CONDA_HOME/include:\$CPATH
+source /opt/hpcx/hpcx-init.sh
+hpcx_load
 ###########################################################
 
 
 ###########################################################
 # CUDA/Torch Setup
 ###########################################################
-export NCCL_DEBUG=warn
+export NCCL_DEBUG=info
 CWD=\$(pwd)
 # Uncomment the following lines to enable detailed NCCL debug logging
 # mkdir -p \$CWD/nccl-logs/\$SLURM_JOB_ID  
@@ -71,9 +61,6 @@ CWD=\$(pwd)
 # export NCCL_DEBUG_SUBSYS=all  # Allows filtering the NCCL_DEBUG=INFO output based on subsystems
 export NCCL_TREE_THRESHOLD=0
 export NCCL_PROTO=simple
-# Network issues without the following two NCCL vars set; See https://github.com/NVIDIA/nccl/issues/676
-export NCCL_IBEXT_DISABLE=1
-export NCCL_SOCKET_IFNAME=^docker0,lo
 
 export PYTHONFAULTHANDLER=1
 export CUDA_LAUNCH_BLOCKING=0
@@ -84,22 +71,10 @@ export TORCH_EXTENSIONS_DIR=\$HOME/.cache/torch_extensions
 
 
 ###########################################################
-# FI Setup (if required)
-###########################################################
-export FI_EFA_FORK_SAFE=1
-export FI_LOG_LEVEL=warn
-export FI_EFA_ENABLE_SHM_TRANSFER=0
-export FI_PROVIDER=efa
-export FI_EFA_TX_MIN_CREDITS=64
-export FI_EFA_USE_DEVICE_RDMA=-1 # use for p4dn
-###########################################################
-
-
-###########################################################
 # MPI Setup (if required)
 ###########################################################
-export OMPI_MCA_mtl_base_verbose=1
-export OMPI_MCA_btl="^openib"
+# export OMPI_MCA_mtl_base_verbose=1
+# export OMPI_MCA_btl="^openib"
 ###########################################################
 
 
@@ -118,9 +93,10 @@ lsof -i
 cat /etc/hosts
 
 # Write the hostfile for this job
-export MASTER_ADDR=\$(echo \$MASTER_ADDR | cut -d '-' -f 2- | tr '-' '.')
 bash \$CWD/scripts/write_hostfile.sh
-export DLTS_HOSTFILE=\$CWD/hostfiles/hosts_\$SLURM_JOBID
+hostfile=\$CWD/hostfiles/hosts_\$SLURM_JOBID
+export DLTS_HOSTFILE=\$hostfile
+echo "DLTS_HOSTFILE: \$DLTS_HOSTFILE"
 ###########################################################
 
 
@@ -128,9 +104,7 @@ export DLTS_HOSTFILE=\$CWD/hostfiles/hosts_\$SLURM_JOBID
 # Environment Setup
 # TODO: Replace with your own environment setup
 ###########################################################
-source \$HOME/.bashrc
-eval "\$(conda shell.bash hook)"
-conda activate stable-neox-env
+source /mnt/nvme/home/$(whoami)/miniconda3/bin/activate stable-neox-env
 ###########################################################
 
 ds_report
@@ -146,7 +120,7 @@ export PYTORCH_CUDA_ALLOC_CONF='max_split_size_mb:256'
 # Run launch vars Setup
 ###########################################################
 export NEOX_WORKING_DIR=$(pwd)
-export NEOX_LAUNCH_CMD="bash deploy.sh -c ${config} -j ${jobname} -n ${nodes} "
+export NEOX_LAUNCH_CMD="bash deploy_coreweave.sh -c ${config} -j ${jobname} -n ${nodes} "
 export NEOX_LAUNCH_CONFIG_PATH=${config}
 export NEOX_LAUNCH_JOB_NAME=${jobname}
 export NEOX_LAUNCH_NODES=${nodes}
@@ -154,8 +128,9 @@ export NEOX_LAUNCH_NODES=${nodes}
 git config --global --add safe.directory \$NEOX_WORKING_DIR
 
 echo "$0 = \$0"
+echo "config = \$NEOX_LAUNCH_CONFIG_PATH"
 wandb login --host https://stability.wandb.io --relogin \$WANDB_API_KEY
-bash -c 'python ./deepy.py train.py ${config}; exit \$?'
+bash -c 'python deepy.py train.py ${config}; exit \$?'
 RETVAL=\$?
 echo "RETVAL = \${RETVAL}"
 # choose your action, we retry when process aborted,killed or signalled but not when it exited with 0 or non-zero code

@@ -187,7 +187,7 @@ def pretrain(neox_args):
         use_wandb=neox_args.use_wandb, tensorboard_writer=neox_args.tensorboard_writer
     )
     # initialize CheckpointCargo, the rank 0 of each host so that we don't have to worry about multiple ranks uploading the same checkpoint
-    
+
     if neox_args.local_rank == 0:
         if neox_args.save is not None and neox_args.s3_path is not None and neox_args.s3_region is not None:
             os.makedirs(neox_args.save, exist_ok=True)
@@ -202,9 +202,6 @@ def pretrain(neox_args):
             print_rank_0(f"Uploading checkpoints to {s3_path}")
         else:
             CG = None
-    
-
-
 
     # Initialize and get arguments, timers, and Tensorboard writer.
     hb = Heartbeat(timeout=neox_args.heartbeat_timeout, kill_timeout=neox_args.kill_timeout)
@@ -310,7 +307,6 @@ def pretrain(neox_args):
             chart_name="test",
         )
         hb.stop()
-    
 
     del hb
     hb = None
@@ -663,7 +659,8 @@ def setup_model_and_optimizer(neox_args, use_cache=False, iteration=None):
             lr_scheduler=_lr_scheduler,
             dist_init_required=False,
             model_parameters=_model_params,
-            config_params=neox_args.deepspeed_config,
+            # Default `neox_args.deepspeed_config` is `None` which raises an error with latest deepspeed.
+            # config_params=neox_args.deepspeed_config,
             mpu=mpu if not neox_args.is_pipe_parallel else None,
         )
         model.total_params = get_total_params(model.module)
@@ -820,9 +817,36 @@ def train(
     # get noise scale logger (if neox_args.log_gradient_noise_scale is True)
     noise_scale_logger = get_noise_scale_logger(neox_args)
 
+    # Remove skip intervals prior to current iteration
+    if neox_args.skip_train_iteration_ranges is not None:
+        import bisect
+        ends = [end for _, end in neox_args.skip_train_iteration_ranges]
+        index = bisect.bisect_left(ends, iteration)
+        for _ in range(index):
+            neox_args.skip_train_iteration_ranges.pop(0)
+
     # to monitor if we've skipped many iterations in a row and trigger an early exit
     overflow_monitor = OverflowMonitor(optimizer)
     while iteration < neox_args.train_iters:
+        # Skip batches in the specified ranges
+        # Based on: https://github.com/bigscience-workshop/Megatron-DeepSpeed/blob/04c461ed786ed0e257690e136d3481957b0ef582/megatron/training.py#L799-L822
+        if (
+            neox_args.skip_train_iteration_ranges is not None
+            and len(neox_args.skip_train_iteration_ranges) > 0
+            and neox_args.skip_train_iteration_ranges[0][0] <= iteration + 1 <= neox_args.skip_train_iteration_ranges[0][1]
+        ):
+            start, end = neox_args.skip_train_iteration_ranges.pop(0)
+            print_rank_0(f"Skipping batches from iterations {start} to {end}")
+            skipped_batch_iter = iteration
+            while skipped_batch_iter + 1 <= end:
+                try:
+                    _ = next(train_data_iterator)
+                except:
+                    pass
+                skipped_batch_iter += 1
+            # Continue with the left over ranges if any
+            continue
+
         hb.start()
         loss_dict, skipped_iter = train_step(
             neox_args=neox_args,

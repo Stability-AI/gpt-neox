@@ -167,12 +167,6 @@ class NeoXArgsModel(NeoXArgsTemplate):
     Disables weight tying between embedding weights and final Linear layer
     """
 
-    multi_query_attention: bool = False
-    """
-    Enables multi-query attention.
-    See: https://arxiv.org/abs/1911.02150
-    """
-
     attention_config: list = None
     """
     Attention configuration for gpt-neox
@@ -192,8 +186,15 @@ class NeoXArgsModel(NeoXArgsTemplate):
         [[[`global`], n_layers]]
     """
 
-    sparsity_config: dict = None
+    attention_head_type: Literal["multihead", "multiquery"] = "multihead"
+    """
+    Type of attention head to use - choose from ["multihead", "multiquery"]
+    
+    multiquery: Attention head type that constrains different heads to share
+        a single set of keys and values. See: https://arxiv.org/abs/1911.02150
+    """
 
+    sparsity_config: dict = None
     """
     Sparsity configuration dict as defined in https://www.deepspeed.ai/docs/config-json/#sparse-attention
 
@@ -291,6 +292,19 @@ class NeoXArgsModel(NeoXArgsTemplate):
     rotary_emb_base: int = 10000
     """
     Base for rotary positional embedding
+    """
+
+    rotary_interleaved: bool = False
+    """
+    Whether to use interleaved rotary positional embedding. If True, rotate pairs
+    of even and odd dimensions (GPT-J style) instead of 1st half and 2nd half
+    (GPT-NeoX style).
+    """
+
+    rotary_scale_base: int = None
+    """
+    If scale_base is not None, this implements XPos (Sun et al., https://arxiv.org/abs/2212.10554). 
+    A good value for this is 512
     """
 
     init_method: Literal[
@@ -803,7 +817,7 @@ class NeoXArgsTraining(NeoXArgsTemplate):
     """
     Timeout for heartbeats between ranks. If a rank does not send a heartbeat within this time, the program will exit.
     """
-    
+
     kill_timeout: int = 30
     """
     Timeout for killing a rank. If a rank does not exit within this time, the program will kill it.
@@ -814,7 +828,7 @@ class NeoXArgsTraining(NeoXArgsTemplate):
     Timeout for saving a checkpoint. If a rank does not save a checkpoint within this time, the program will exit.
     """
 
-    eval_interval_timeout: int = 1_200
+    eval_interval_timeout: int = 5_400
     """
     Timeout for running evaluation. If a rank does not finish evaluation within this time, the program will exit.
     """
@@ -1098,6 +1112,13 @@ class NeoXArgsTraining(NeoXArgsTemplate):
     mup_width_scale: int = 2
     """
     What to scale width by when creating the delta model for mup
+    """
+
+    skip_train_iteration_ranges: list = None
+    """
+    List of iteration ranges to skip during training. If None, no iterations are skipped.
+    Example: `[[start1, end1], [start2, end2]]` will skip iterations in the ranges
+        [start1, end1] and [start2, end2]
     """
 
 

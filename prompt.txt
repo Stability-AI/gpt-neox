@@ -1,8 +1,0 @@
-Show HN: My daughter and I made a site to explore the photos from the ISS 
-Drive through cities in the browser while listening to local radio stations
-Recycling is good for the world.
-The best way to learn a new language is
-def is_palindrome(s):
-Can you imagine
-<div class="navbar"><bold>Home</bold> | 
-Warning: pip is being invoked by an old script wrapper

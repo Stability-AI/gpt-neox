@@ -1018,6 +1018,29 @@ class NeoXArgs(*BASE_CLASSES):
                 not self.partition_activations
             ), "GMLP Blocks are not compatible with partition activations"
 
+        # Skip iteration config
+        if self.skip_train_iteration_ranges:
+            self.skip_train_iteration_ranges.sort()
+            import collections
+            skip_train_iteration_ranges = collections.deque()
+            for _range in self.skip_train_iteration_ranges:
+                if len(_range) == 2:
+                    start, end = _range
+                    assert end >= start, \
+                        f"Invalid skip iteration range: {start} >= {end}"
+                    # Merge overlapping intervals (e.g. [[1, 5], [2, 6]])
+                    if not skip_train_iteration_ranges:
+                        skip_train_iteration_ranges.append([start, end])
+                    elif skip_train_iteration_ranges[-1][1] >= start:
+                        skip_train_iteration_ranges[-1][1] = max(
+                            end, skip_train_iteration_ranges[-1][1]
+                        )
+                    else:
+                        skip_train_iteration_ranges.append([start, end])
+                else:
+                    raise ValueError("Skip iteration range should be specified as 2 numbers: [`start, end`]")
+            self.update_value("skip_train_iteration_ranges", list(skip_train_iteration_ranges))
+
         # Sparsity config
         if self.sparsity_config is None:
             # Can't have a default value as an empty dict so need to set it here
