@@ -1113,6 +1113,13 @@ class NeoXArgsTraining(NeoXArgsTemplate):
     What to scale width by when creating the delta model for mup
     """
 
+    skip_train_iteration_ranges: list = None
+    """
+    List of iteration ranges to skip during training. If None, no iterations are skipped.
+    Example: `[[start1, end1], [start2, end2]]` will skip iterations in the ranges
+        [start1, end1] and [start2, end2]
+    """
+
 
 @dataclass
 class NeoXArgsTextgen(NeoXArgsTemplate):

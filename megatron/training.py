@@ -816,9 +816,36 @@ def train(
     # get noise scale logger (if neox_args.log_gradient_noise_scale is True)
     noise_scale_logger = get_noise_scale_logger(neox_args)
 
+    # Remove skip intervals prior to current iteration
+    if neox_args.skip_train_iteration_ranges is not None:
+        import bisect
+        ends = [end for _, end in neox_args.skip_train_iteration_ranges]
+        index = bisect.bisect_left(ends, iteration)
+        for _ in range(index):
+            neox_args.skip_train_iteration_ranges.pop(0)
+
     # to monitor if we've skipped many iterations in a row and trigger an early exit
     overflow_monitor = OverflowMonitor(optimizer)
     while iteration < neox_args.train_iters:
+        # Skip batches in the specified ranges
+        # Based on: https://github.com/bigscience-workshop/Megatron-DeepSpeed/blob/04c461ed786ed0e257690e136d3481957b0ef582/megatron/training.py#L799-L822
+        if (
+            neox_args.skip_train_iteration_ranges is not None
+            and len(neox_args.skip_train_iteration_ranges) > 0
+            and neox_args.skip_train_iteration_ranges[0][0] <= iteration + 1 <= neox_args.skip_train_iteration_ranges[0][1]
+        ):
+            start, end = neox_args.skip_train_iteration_ranges.pop(0)
+            print_rank_0(f"Skipping batches from iterations {start} to {end}")
+            skipped_batch_iter = iteration
+            while skipped_batch_iter + 1 <= end:
+                try:
+                    _ = next(train_data_iterator)
+                except:
+                    pass
+                skipped_batch_iter += 1
+            # Continue with the left over ranges if any
+            continue
+
         hb.start()
         loss_dict, skipped_iter = train_step(
             neox_args=neox_args,
