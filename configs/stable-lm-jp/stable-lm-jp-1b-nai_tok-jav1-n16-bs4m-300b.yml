@@ -1,0 +1,166 @@
+{
+    "num_workers": 0,
+    "s3_path": "s3://stability-checkpoints-east",
+    "s3_region": "us-east-1",
+    "pipe-parallel-size": 1,
+    "model-parallel-size": 1,
+    "num-layers": 24,
+    "hidden-size": 2048,
+    "num-attention-heads": 16,
+    "seq-length": 2048,
+    "max-position-embeddings": 2048,
+    "norm": "layernorm",
+    "pos-emb": "rotary",
+    "rotary_pct": 0.25,
+    "activation": "gelu",
+    "no-weight-tying": true,
+    "gpt-j-residual": true,
+    "output-layer-parallelism": "column",
+    "init_method": "small_init",
+    "output_layer_init_method": "wang_init",
+    "scaled-upper-triang-masked-softmax-fusion": true,
+    "bias-gelu-fusion": true,
+    "attention-config": [
+        [
+            [
+                "flash"
+            ],
+            24
+        ]
+    ],
+    "optimizer": {
+        "type": "Adam",
+        "params": {
+            "lr": 0.00012,
+            "betas": [
+                0.9,
+                0.95
+            ],
+            "eps": 1.0e-8
+        }
+    },
+    "min_lr": 1.2e-5,
+    "zero_optimization": {
+        "stage": 1,
+        "allgather_partitions": true,
+        "allgather_bucket_size": 1260000000,
+        "overlap_comm": true,
+        "reduce_scatter": true,
+        "reduce_bucket_size": 1260000000,
+        "contiguous_gradients": true,
+        "cpu_offload": false
+    },
+    "train_micro_batch_size_per_gpu": 4,
+    "gradient_accumulation_steps": 4,
+    "eval_batch_size": 64,
+    "data-impl": "mmap",
+    "checkpoint-activations": true,
+    "checkpoint-num-layers": 1,
+    "partition-activations": true,
+    "synchronize-each-layer": true,
+    "gradient_clipping": 1.0,
+    "weight-decay": 0.1,
+    "hidden-dropout": 0,
+    "attention-dropout": 0,
+    "fp16": {
+        "fp16": true,
+        "enabled": true,
+        "loss_scale": 0,
+        "loss_scale_window": 1000,
+        "initial_scale_power": 12,
+        "hysteresis": 2,
+        "min_loss_scale": 1
+    },
+    "train-iters": 71500,
+    "lr-decay-iters": 71500,
+    "distributed-backend": "nccl",
+    "lr-decay-style": "cosine",
+    "warmup": 0.01,
+    "checkpoint-factor": 1000,
+    "eval-interval": 1001,
+    "eval-iters": 10,
+    "eval_tasks": [
+        "jcommonsenseqa-1.1-0.2",
+        "jnli-1.1-0.2",
+        "marc_ja-1.1-0.2"
+    ],
+    "eval_num_fewshot": [
+        3,
+        3,
+        3
+    ],
+    "eval_limit": [
+        0.25,
+        0.25,
+        0.25
+    ],
+    "use_wandb": true,
+    "wandb_host": "https://stability.wandb.io",
+    "wandb_team": "stability-llm",
+    "wandb_project": "stable-lm-jp",
+    "wandb_group": "1B",
+    "wandb_name": "1B.nai.jav1.bs_4m.tp_1.pp_1.dtype_int64.300B",
+    "save": "/fsx/jp-llm/ckpts/1b_tok=nai_data=jav1_bs=4m_tp=1_pp=1_dtype=int64",
+    "load": "/fsx/jp-llm/ckpts/1b_tok=nai_data=jav1_bs=4m_tp=1_pp=1_dtype=int64",
+    "log-interval": 1,
+    "steps_per_print": 10,
+    "wall_clock_breakdown": true,
+    "tokenizer-type": "SPMTokenizer",
+    "vocab-file": "/fsx/jp-llm/tokenizers/novelai-tokenizer/novelai.model",
+    "train-data-paths": [
+        "/fsx/jp-llm/merged/wikipedia/wikipedia_text_document",
+        "/fsx/jp-llm/merged/oscar-2201/oscar-2201_text_document",
+        "/fsx/jp-llm/merged/oscar-2109/oscar-2109_text_document",
+        "/fsx/jp-llm/merged/oscar-2301/oscar-2301_text_document",
+        "/fsx/jp-llm/merged/cc-100/cc-100_text_document",
+        "/fsx/jp-llm/merged/oscar/oscar_text_document",
+        "/fsx/jp-llm/merged/mc4/mc4_text_document"
+    ],
+    "train-data-weights": [
+        0.67,
+        8.48,
+        10.3,
+        10.9,
+        12.72,
+        16.35,
+        40.58
+    ],
+    "valid-data-paths": [
+        "/fsx/jp-llm/merged/wikipedia/wikipedia_text_document",
+        "/fsx/jp-llm/merged/oscar-2201/oscar-2201_text_document",
+        "/fsx/jp-llm/merged/oscar-2109/oscar-2109_text_document",
+        "/fsx/jp-llm/merged/oscar-2301/oscar-2301_text_document",
+        "/fsx/jp-llm/merged/cc-100/cc-100_text_document",
+        "/fsx/jp-llm/merged/oscar/oscar_text_document",
+        "/fsx/jp-llm/merged/mc4/mc4_text_document"
+    ],
+    "valid-data-weights": [
+        0.67,
+        8.48,
+        10.3,
+        10.9,
+        12.72,
+        16.35,
+        40.58
+    ],
+    "test-data-paths": [
+        "/fsx/jp-llm/merged/wikipedia/wikipedia_text_document",
+        "/fsx/jp-llm/merged/oscar-2201/oscar-2201_text_document",
+        "/fsx/jp-llm/merged/oscar-2109/oscar-2109_text_document",
+        "/fsx/jp-llm/merged/oscar-2301/oscar-2301_text_document",
+        "/fsx/jp-llm/merged/cc-100/cc-100_text_document",
+        "/fsx/jp-llm/merged/oscar/oscar_text_document",
+        "/fsx/jp-llm/merged/mc4/mc4_text_document"
+    ],
+    "test-data-weights": [
+        0.67,
+        8.48,
+        10.3,
+        10.9,
+        12.72,
+        16.35,
+        40.58
+    ],
+    "launcher": "slurm",
+    "deepspeed_slurm": true
+}
