@@ -196,7 +196,7 @@ class SentencePieceTokenizer(AbstractTokenizer):
         super().__init__(name)
 
         self.tokenizer = spm.SentencePieceProcessor(model_file=vocab_file)
-        self.eod_id = self.tokenizer.piece_to_id("<|endoftext|>")
+        self.eod_id = self.tokenizer.eos_id()
 
     @property
     def vocab_size(self):
@@ -246,7 +246,7 @@ class MeCabTokenizer(AbstractTokenizer):
         self.mecab = fugashi.Tagger(mecab_args)
 
         self.sp = spm.SentencePieceProcessor(model_file=vocab_file)
-        self.eod_id = self.sp.piece_to_id("<|endoftext|>")
+        self.eod_id = self.sp.eos_id()
 
     @property
     def vocab_size(self):
