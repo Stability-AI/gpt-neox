@@ -575,6 +575,17 @@ class NeoXArgsLogging(NeoXArgsTemplate):
     Whether to offload the buffered gradients to cpu when measuring gradient noise scale.
     """
 
+    """
+    These are intended to update by global variables
+    See deploy.sh 
+    """
+    neox_working_dir: str = None
+    neox_launch_cmd: str = None
+    neox_launch_config_path: str = None
+    neox_launch_job_name: str = None
+    neox_working_dir: str = None
+    slurm_job_id: str = None
+
 
 @dataclass
 class NeoXArgsOther(NeoXArgsTemplate):
