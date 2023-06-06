@@ -59,6 +59,8 @@ class Encoder(object):
             doc_ids[-1].append(Encoder.tokenizer.eod)
         for key in self.args.jsonl_keys:
             ids[key] = doc_ids
+        # example output: (3 = eod id)
+        # {"text": [[1, 2, 3]]}, 12
         return ids, len(text)
 
 
