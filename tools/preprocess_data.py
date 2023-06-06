@@ -47,17 +47,17 @@ class Encoder(object):
         # Use Encoder class as a container for global data
         Encoder.tokenizer = build_tokenizer(self.args)
 
-    def encode(self, text):
+    def encode(self, text: str):
         if self.args.ftfy:
             text = ftfy.fix_text(text)
         ids = {}
+        doc_ids = []
+        text_ids = Encoder.tokenizer.tokenize(text)
+        if len(text_ids) > 0:
+            doc_ids.append(text_ids)
+        if self.args.append_eod:
+            doc_ids[-1].append(Encoder.tokenizer.eod)
         for key in self.args.jsonl_keys:
-            doc_ids = []
-            text_ids = Encoder.tokenizer.tokenize(text)
-            if len(text_ids) > 0:
-                doc_ids.append(text_ids)
-            if self.args.append_eod:
-                doc_ids[-1].append(Encoder.tokenizer.eod)
             ids[key] = doc_ids
         return ids, len(text)
 
