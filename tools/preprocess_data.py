@@ -76,7 +76,7 @@ def get_args():
         "--jsonl-keys",
         nargs="+",
         default=["text"],
-        help="space separate listed of keys to extract from jsonl. Defa",
+        help="space separate listed of keys to extract from jsonl. Default is `text`",
     )
     group.add_argument(
         "--num-docs",
