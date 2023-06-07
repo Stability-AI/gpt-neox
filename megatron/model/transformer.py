@@ -22,6 +22,7 @@ import math
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
+import inspect
 
 from .norms import get_norm
 from megatron import mpu, print_rank_0
@@ -85,7 +86,8 @@ class ParallelMLP(nn.Module):
 
         self.activation_func = get_activation(neox_args)
         self.activation_type = neox_args.activation
-        self.bias_gelu_fusion = neox_args.bias_gelu_fusion
+        self.bias_gelu_fusion = neox_args.bias_gelu_fusion and neox_args.use_bias_in_mlp
+        self.use_bias_in_mlp = neox_args.use_bias_in_mlp
 
         # auto scale so GLU variants have equal parameters
         self.use_glu = self.activation_type in ["geglu", "swiglu"]
@@ -102,6 +104,7 @@ class ParallelMLP(nn.Module):
             gather_output=False,
             init_method=init_method,
             skip_bias_add=True,
+            bias=self.use_bias_in_mlp,
         )
         ff_dim_in = ff_dim // 2 if self.use_glu else ff_dim
         # Project back to h.
@@ -113,6 +116,7 @@ class ParallelMLP(nn.Module):
             init_method=output_layer_init_method,
             skip_bias_add=True,
             parallel_output=parallel_output,
+            bias=self.use_bias_in_mlp,
         )
 
     def forward(self, hidden_states):
@@ -126,10 +130,12 @@ class ParallelMLP(nn.Module):
             intermediate_parallel = self.activation_func(
                 intermediate_parallel, bias_parallel
             )
-        else:
+        elif self.use_bias_in_mlp:
             intermediate_parallel = self.activation_func(
                 intermediate_parallel + bias_parallel
             )
+        else:
+            intermediate_parallel = self.activation_func(intermediate_parallel)
 
         # [s, b, h]
         output, output_bias = self.dense_4h_to_h(intermediate_parallel)
@@ -315,6 +321,7 @@ class ParallelSelfAttention(nn.Module):
             init_method=output_layer_init_method,
             skip_bias_add=True,
             parallel_output=parallel_output,
+            bias=neox_args.use_bias_in_attn_linear,
         )
 
     def attention(
@@ -681,6 +688,7 @@ class FlashParallelSelfAttention(nn.Module):
                 output_size=3 * neox_args.hidden_size,
                 gather_output=False,
                 init_method=init_method,
+                bias=neox_args.use_bias_in_attn_linear,
             )
         elif self.attention_head_type == "multiquery":
             self.query = mpu.ColumnParallelLinear(
@@ -689,6 +697,7 @@ class FlashParallelSelfAttention(nn.Module):
                 output_size=neox_args.hidden_size,
                 gather_output=False,
                 init_method=init_method,
+                bias=neox_args.use_bias_in_attn_linear,
             )
             # TODO: This doesn't need to be ColumnParallelLinear
             self.key_value = mpu.ColumnParallelLinear(
@@ -697,6 +706,7 @@ class FlashParallelSelfAttention(nn.Module):
                 output_size=2 * self.hidden_size_per_attention_head,
                 gather_output=False,
                 init_method=init_method,
+                bias=neox_args.use_bias_in_attn_linear,
             )
         else:
             raise ValueError(
@@ -724,7 +734,6 @@ class FlashParallelSelfAttention(nn.Module):
             )
         else:
             self.rotary_emb = None
-        self.attention_type = neox_args.attention_config[layer_number]
 
         from megatron.model.flash_attention import (
             flash_attn_unpadded_qkvpacked_func_cuda,
@@ -888,11 +897,15 @@ class ParallelTransformerLayer(nn.Module):
         norm, eps = get_norm(neox_args)
 
         # Layernorm on the input data.
-        self.input_layernorm = norm(neox_args.hidden_size, eps=eps)
+        norm_kwargs = {"eps": eps}
+        if "elementwise_affine" in inspect.getfullargspec(norm.__init__).args:
+            norm_kwargs["elementwise_affine"] = neox_args.use_bias_in_norms
+        self.input_layernorm = norm(neox_args.hidden_size, **norm_kwargs)
         self.use_cache = use_cache
 
         self.hidden_dropout = neox_args.hidden_dropout
         self.bias_dropout_fusion = neox_args.bias_dropout_fusion
+        self.use_bias_dropout_in_layer = neox_args.use_bias_dropout_in_layer
         self.gpt_j_residual = neox_args.gpt_j_residual
         self.gpt_j_tied = neox_args.gpt_j_tied
 
@@ -977,23 +990,28 @@ class ParallelTransformerLayer(nn.Module):
                 attention_output, presents = attention_output
                 self.layer_past = presents
 
-            with torch.enable_grad():
-                attention_output = bias_dropout_fn(
-                    attention_output,
-                    bias=attention_bias.expand_as(attention_output),
-                    residual=None,
-                    prob=self.hidden_dropout,
-                )
+            if self.use_bias_dropout_in_layer and attention_bias is not None:
+                with torch.enable_grad():
+                    attention_output = bias_dropout_fn(
+                        attention_output,
+                        bias=attention_bias.expand_as(attention_output),
+                        residual=None,
+                        prob=self.hidden_dropout,
+                    )
 
             # mlp operator
             mlp_output, mlp_bias = self.mlp(x2)
             with torch.enable_grad():
-                output = bias_dropout_fn(
-                    mlp_output,
-                    bias=mlp_bias.expand_as(mlp_output),
-                    residual=attention_output,
-                    prob=self.hidden_dropout,
-                )
+                if self.use_bias_dropout_in_layer:
+                    output = bias_dropout_fn(
+                        mlp_output,
+                        bias=mlp_bias.expand_as(mlp_output),
+                        residual=attention_output,
+                        prob=self.hidden_dropout,
+                    )
+                else:
+                    assert mlp_bias is None
+                    output = mlp_output + attention_output
 
             # output = (x + attn(ln(x)) + mlp(ln(x))
             output = residual + self.reduce(output)
@@ -1012,24 +1030,35 @@ class ParallelTransformerLayer(nn.Module):
                 attention_output, presents = attention_output
                 self.layer_past = presents
             with torch.enable_grad():
-                attention_output = bias_dropout_fn(
-                    attention_output,
-                    bias=attention_bias.expand_as(residual),
-                    residual=residual,
-                    prob=self.hidden_dropout,
-                )
+                if attention_bias is not None and self.use_bias_dropout_in_layer:
+                    # Use special bias_dropout_fn if we have a bias term from the above attention layer
+                    attention_output = bias_dropout_fn(
+                        attention_output,
+                        bias=attention_bias.expand_as(residual),
+                        residual=residual,
+                        prob=self.hidden_dropout,
+                    )
+                else:
+                    # Otherwise just apply dropout + residual
+                    attention_output = torch.nn.functional.dropout(
+                        attention_output, p=self.hidden_dropout, training=self.training
+                    ) + residual
 
             # output = x + mlp(ln2(x))
             mlp_output, mlp_bias = self.mlp(
                 self.post_attention_layernorm(attention_output)
             )
             with torch.enable_grad():
-                output = bias_dropout_fn(
-                    mlp_output,
-                    bias=mlp_bias.expand_as(attention_output),
-                    residual=attention_output,
-                    prob=self.hidden_dropout,
-                )
+                if self.use_bias_dropout_in_layer:
+                    output = bias_dropout_fn(
+                        mlp_output,
+                        bias=mlp_bias.expand_as(attention_output),
+                        residual=attention_output,
+                        prob=self.hidden_dropout,
+                    )
+                else:
+                    assert mlp_bias is None
+                    output = mlp_output + attention_output
 
         return output
 

@@ -1187,6 +1187,15 @@ class NeoXArgs(*BASE_CLASSES):
             raise ValueError(error_message)
             return False
 
+        if self.bias_gelu_fusion and not self.use_bias_in_mlp:
+            error_message = (
+                self.__class__.__name__
+                + ".validate_values() cannot apply bias GeLU fusion when bias terms are not used in the mlp."
+            )
+            logging.error(error_message)
+            raise ValueError(error_message)
+            return False
+
         # assert that if one of train/test/valid_data_path are provided, data_path should not be
         has_separate_path = [
             data_path is not None
