@@ -14,6 +14,7 @@
 
 import sys
 import torch
+import numpy as np
 
 try:
     import wandb
@@ -22,6 +23,7 @@ except ModuleNotFoundError:
 
 from megatron import mpu, print_rank_0
 from megatron.utils import report_memory
+from megatron.seqlen_warmup_tokens import fixed_linear_seqlen_warmup_schedule
 
 
 class Tee:
@@ -303,6 +305,24 @@ def training_log(
         )
 
         # log tokens seen so far
+        if neox_args.curriculum_learning:
+            cl = neox_args.curriculum_learning
+            assert cl['schedule_type'] == "fixed_linear", \
+                "Only `fixed_linear` curriculum is supported at this time"
+
+            cl_steps = cl['schedule_config']['total_curriculum_step']
+            seq_len_schedule = fixed_linear_seqlen_warmup_schedule(
+                start_seqlen=cl['min_difficulty'],
+                end_seqlen=cl['max_difficulty'],
+                total_steps=cl_steps,
+                step_size=cl['schedule_config']['difficulty_step']
+            )
+
+            tokens = np.sum(seq_len_schedule[:iteration] * neox_args.train_batch_size) \
+                + neox_args.train_batch_size * neox_args.seq_length * np.max([0, iteration - cl_steps])
+        else:
+            tokens = neox_args.train_batch_size * neox_args.seq_length * iteration
+            
         tb_wandb_log(
             "runtime/tokens",
             neox_args.train_batch_size * neox_args.seq_length * iteration,

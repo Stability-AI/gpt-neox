@@ -259,6 +259,26 @@ class NeoXArgsModel(NeoXArgsTemplate):
     Enable bias and dropout fusion.
     """
 
+    use_bias_in_norms: bool = True
+    """
+    If false, norms (e.g. LayerNorm) will not have bias terms.
+    """
+
+    use_bias_in_attn_linear: bool = True
+    """
+    If false, linear projection layers in attention (e.g. qkv) will not have bias terms.
+    """
+
+    use_bias_in_mlp: bool = True
+    """
+    If false, feedforward layers in transformer blocks will not have bias terms.
+    """
+
+    use_bias_dropout_in_layer: bool = True
+    """
+    If false, do not add final bias and dropout to transformer layer output.
+    """
+
     fp16_lm_cross_entropy: bool = False
     """
     Move the cross entropy unreduced loss calculation for lm head to fp16.
